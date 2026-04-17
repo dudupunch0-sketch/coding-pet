@@ -9,6 +9,7 @@ from typing import Any
 from coding_pet.gui.theme import WidgetTheme, default_theme
 from coding_pet.ipc.client import IpcClient
 from coding_pet.models import SessionStatus
+from coding_pet.state_store import StateStore
 
 
 def layout_sessions(
@@ -33,6 +34,7 @@ def layout_sessions(
 class CodingPetWidgetApp:
     theme: WidgetTheme = field(default_factory=default_theme)
     socket_path: Path | None = None
+    state_store: StateStore | None = None
     widgets: dict[str, Any] = field(default_factory=dict)
     _client: IpcClient | None = field(init=False, default=None)
     _listen_task: asyncio.Task[None] | None = field(init=False, default=None)
@@ -79,6 +81,12 @@ class CodingPetWidgetApp:
             x, y = positions[status.session_id]
             widget.move(x, y)
             widget.show()
+
+    async def load_snapshot(self) -> None:
+        if self.state_store is None:
+            return
+        sessions = await self.state_store.read_sessions()
+        self.show_sessions(sessions)
 
     async def connect_to_daemon(self, *, message_limit: int | None = None) -> None:
         if self.socket_path is None:

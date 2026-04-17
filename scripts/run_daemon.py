@@ -8,12 +8,17 @@ from pathlib import Path
 async def _main() -> None:
     from coding_pet.config import load_config
     from coding_pet.daemon.app import DaemonApp
+    from coding_pet.state_store import StateStore
 
     config = load_config()
     config.runtime_dir.mkdir(parents=True, exist_ok=True)
     _daemon = DaemonApp()
+    _state_store = StateStore(config.state_file)
     print(
-        f"coding-pet daemon placeholder ready; runtime_dir={config.runtime_dir}",
+        (
+            "coding-pet daemon placeholder ready; "
+            f"runtime_dir={config.runtime_dir} state_file={config.state_file}"
+        ),
         flush=True,
     )
     await asyncio.Event().wait()

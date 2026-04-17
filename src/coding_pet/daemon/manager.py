@@ -10,6 +10,7 @@ from coding_pet.daemon.session_registry import SessionRegistry
 from coding_pet.models import AttentionState, SessionStatus
 from coding_pet.notifiers.base import Notification, Notifier
 from coding_pet.notifiers.desktop import DesktopNotifier
+from coding_pet.state_store import StateStore
 
 
 class MonitorManager:
@@ -20,11 +21,13 @@ class MonitorManager:
         stall_timeout: timedelta = timedelta(minutes=5),
         notifier: Notifier | None = None,
         notification_cooldown: timedelta = timedelta(minutes=1),
+        state_store: StateStore | None = None,
     ) -> None:
         self.registry = registry
         self.stall_timeout = stall_timeout
         self.notifier = notifier or DesktopNotifier()
         self.notification_cooldown = notification_cooldown
+        self.state_store = state_store
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._last_seen_states: dict[str, AttentionState] = {}
         self._last_notified_at: dict[tuple[str, AttentionState], datetime] = {}
@@ -72,7 +75,22 @@ class MonitorManager:
             return
         await asyncio.gather(*self._tasks.values())
 
+    async def restore_from_store(self) -> list[SessionStatus]:
+        if self.state_store is None:
+            return []
+        restored = await self.state_store.restore_sessions()
+        for status in restored:
+            await self.registry.upsert(status)
+        return restored
+
+    async def persist_snapshot(self) -> None:
+        if self.state_store is None:
+            return
+        await self.state_store.write_sessions(await self.registry.list_sessions())
+
     async def _handle_registry_message(self, message: dict[str, object]) -> None:
+        if message.get("type") in {"session_updated", "session_removed"}:
+            await self.persist_snapshot()
         if message.get("type") != "session_updated":
             return
         session_data = message.get("session")

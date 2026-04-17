@@ -61,6 +61,7 @@ def test_app_config_defaults_are_production_safe(tmp_path: Path) -> None:
         state_dir=tmp_path / "state",
         runtime_dir=tmp_path / "run",
         log_dir=tmp_path / "logs",
+        state_file=tmp_path / "state" / "state.json",
     )
 
     assert config.log_level == "INFO"

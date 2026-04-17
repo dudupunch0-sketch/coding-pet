@@ -14,6 +14,7 @@ class AppConfig:
     state_dir: Path
     runtime_dir: Path
     log_dir: Path
+    state_file: Path
     log_level: str = "INFO"
     capture_transcripts: bool = False
     notification_cooldown_seconds: int = 60
@@ -46,6 +47,7 @@ def load_config() -> AppConfig:
     state_dir = _path_from_env("CODING_PET_STATE_DIR")
     runtime_dir = _path_from_env("CODING_PET_RUNTIME_DIR")
     log_dir = _path_from_env("CODING_PET_LOG_DIR")
+    state_file = _path_from_env("CODING_PET_STATE_FILE")
 
     resolved_config_dir = config_dir or (_xdg_dir("XDG_CONFIG_HOME", ".config") / APP_NAME)
     resolved_state_dir = state_dir or (_xdg_dir("XDG_STATE_HOME", ".local/state") / APP_NAME)
@@ -56,12 +58,14 @@ def load_config() -> AppConfig:
         else resolved_state_dir / "runtime"
     )
     resolved_log_dir = log_dir or (resolved_state_dir / "logs")
+    resolved_state_file = state_file or (resolved_state_dir / "state.json")
 
     return AppConfig(
         config_dir=resolved_config_dir,
         state_dir=resolved_state_dir,
         runtime_dir=resolved_runtime_dir,
         log_dir=resolved_log_dir,
+        state_file=resolved_state_file,
         log_level=os.getenv("CODING_PET_LOG_LEVEL", "INFO").upper(),
         capture_transcripts=os.getenv("CODING_PET_CAPTURE_TRANSCRIPTS", "false").lower()
         in {"1", "true", "yes", "on"},
