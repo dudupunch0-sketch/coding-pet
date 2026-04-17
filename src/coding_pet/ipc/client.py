@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import json
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +28,8 @@ class IpcClient:
         line = await self._reader.readline()
         if not line:
             raise RuntimeError("IPC server closed connection")
+        import json
+
         message = json.loads(line)
         if not isinstance(message, dict):
             raise RuntimeError("IPC server returned a non-object message")
@@ -36,8 +38,19 @@ class IpcClient:
     async def send(self, message: dict[str, Any]) -> None:
         if self._writer is None:
             raise RuntimeError("IPC client is not connected")
+        import json
+
         self._writer.write((json.dumps(message) + "\n").encode())
         await self._writer.drain()
+
+    async def stream_messages(self) -> AsyncIterator[dict[str, Any]]:
+        if self._reader is None:
+            raise RuntimeError("IPC client is not connected")
+        while True:
+            try:
+                yield await self.read_message()
+            except RuntimeError:
+                break
 
     async def close(self) -> None:
         if self._writer is not None:
