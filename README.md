@@ -21,6 +21,8 @@ Implemented today:
 - desktop notification backend with cooldowns
 - widget shell, panel view model, and snapshot boot support
 - JSON state persistence for restart resilience
+- packaged systemd user-service unit files
+- theme manifest and asset validation pipeline
 
 Still in progress:
 - full daemon service runtime

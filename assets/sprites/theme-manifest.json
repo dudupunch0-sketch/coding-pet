@@ -1,0 +1,16 @@
+{
+  "theme": "classic",
+  "sprites": {
+    "idle": "classic/idle.txt",
+    "typing": "classic/typing.txt",
+    "celebrate": "classic/celebrate.txt",
+    "alert": "classic/alert.txt",
+    "thinking": "classic/thinking.txt",
+    "sleepy": "classic/sleepy.txt",
+    "sad": "classic/sad.txt"
+  },
+  "audio": {
+    "alert": "classic/alert.txt",
+    "celebrate": "classic/celebrate.txt"
+  }
+}

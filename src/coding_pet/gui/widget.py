@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from coding_pet.gui.bubble import bubble_text_for_status
 from coding_pet.gui.session_panel import SessionPanelViewModel
-from coding_pet.gui.theme import WidgetTheme, mood_for_status
+from coding_pet.gui.theme import (
+    WidgetTheme,
+    load_theme_manifest,
+    mood_for_status,
+    resolve_sprite_for_mood,
+)
 from coding_pet.models import SessionStatus
 
 
@@ -120,6 +126,15 @@ class CodingPetWidgetShell:
         self._bubble_label = bubble_label
 
     def _pet_glyph(self, mood: str) -> str:
+        manifest = load_theme_manifest(Path("assets/sprites/theme-manifest.json"))
+        sprite_path = resolve_sprite_for_mood(
+            manifest,
+            mood=type(next(iter(manifest.sprites.keys())))(mood),
+            assets_root=Path("assets/sprites"),
+        )
+        asset_file = Path("assets/sprites") / sprite_path
+        if asset_file.exists():
+            return asset_file.read_text("utf-8").strip()
         return {
             "idle": "(=^･ω･^=)",
             "typing": "(=^･o･^=)ﾉ⌨",
