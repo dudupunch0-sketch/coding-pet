@@ -1,18 +1,28 @@
 # coding-pet
 
-Minimal Git project scaffold.
+coding-pet is a production-quality desktop companion for monitoring multiple AI coding agent sessions on Linux systems such as Red Hat Enterprise Linux 8.10.
 
-## Getting started
+## Current direction
 
-1. Add your source files.
-2. Commit your changes with Git.
-3. Add a remote when you're ready to publish:
+- Python application with a long-running daemon and GUI widget layer
+- One pet per monitored session
+- Shared control panel for all sessions
+- Claude Code CLI and OpenCode CLI monitoring targets
+- Screen-edge stack layout for multiple pets
+
+## Development setup
 
 ```bash
-git remote add origin <your-repo-url>
-git push -u origin master
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e '.[dev]'
+pytest -v
 ```
 
-## Current status
+## Planned CLI surface
 
-This repository is initialized and ready for its first real commit.
+```bash
+coding-pet daemon run
+coding-pet widget run
+coding-pet admin doctor
+```
