@@ -26,7 +26,33 @@ Still in progress:
 - full daemon service runtime
 - full widget runtime command integration
 - production sprite assets
-- systemd packaging and RHEL deployment polish
+
+## Packaging and user services
+
+The package already exports a console entrypoint:
+```bash
+coding-pet --help
+```
+
+The repository now includes user-service unit files under `packaging/systemd/`:
+- `coding-pet-daemon.service`
+- `coding-pet-widget.service`
+- `coding-pet.target`
+
+Validate them with:
+```bash
+systemd-analyze verify packaging/systemd/coding-pet-daemon.service
+systemd-analyze verify packaging/systemd/coding-pet-widget.service
+systemd-analyze verify packaging/systemd/coding-pet.target
+```
+
+For a source checkout, install/link them into the user systemd directory:
+```bash
+mkdir -p ~/.config/systemd/user
+cp packaging/systemd/coding-pet-* ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now coding-pet.target
+```
 
 ## Development setup
 

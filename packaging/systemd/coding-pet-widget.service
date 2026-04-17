@@ -1,0 +1,18 @@
+[Unit]
+Description=Coding Pet widget
+After=graphical-session.target coding-pet-daemon.service
+Wants=graphical-session.target coding-pet-daemon.service
+PartOf=coding-pet.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/company/coding-pet
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=%h/company/coding-pet/src
+Environment=XDG_RUNTIME_DIR=%t
+ExecStart=/usr/bin/env python scripts/run_widget.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

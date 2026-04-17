@@ -1,0 +1,4 @@
+[Unit]
+Description=Coding Pet user session target
+Wants=coding-pet-daemon.service coding-pet-widget.service
+After=coding-pet-daemon.service coding-pet-widget.service

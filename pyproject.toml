@@ -28,6 +28,20 @@ coding-pet = "coding_pet.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/coding_pet"]
 
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src/coding_pet",
+  "/scripts",
+  "/packaging/systemd",
+  "/README.md",
+  "/docs",
+]
+
+[tool.hatch.build.targets.wheel.shared-data]
+"packaging/systemd/coding-pet-daemon.service" = "share/coding-pet/systemd/coding-pet-daemon.service"
+"packaging/systemd/coding-pet-widget.service" = "share/coding-pet/systemd/coding-pet-widget.service"
+"packaging/systemd/coding-pet.target" = "share/coding-pet/systemd/coding-pet.target"
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]

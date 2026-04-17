@@ -40,6 +40,11 @@ Top-level help:
 PYTHONPATH=src python -m coding_pet.cli --help
 ```
 
+Installed console script help:
+```bash
+coding-pet --help
+```
+
 Daemon help:
 ```bash
 PYTHONPATH=src python -m coding_pet.cli daemon --help
@@ -81,6 +86,30 @@ PYTHONPATH=src python -m coding_pet.cli daemon monitor \
 This validates the current monitor command path. A full long-running service wrapper is still pending.
 
 ## Files and paths
+
+Systemd user-service unit files are shipped in this repository under:
+- `packaging/systemd/coding-pet-daemon.service`
+- `packaging/systemd/coding-pet-widget.service`
+- `packaging/systemd/coding-pet.target`
+
+Validate them with:
+```bash
+systemd-analyze verify packaging/systemd/coding-pet-daemon.service
+systemd-analyze verify packaging/systemd/coding-pet-widget.service
+systemd-analyze verify packaging/systemd/coding-pet.target
+```
+
+Install for the current user:
+```bash
+mkdir -p ~/.config/systemd/user
+cp packaging/systemd/coding-pet-daemon.service ~/.config/systemd/user/
+cp packaging/systemd/coding-pet-widget.service ~/.config/systemd/user/
+cp packaging/systemd/coding-pet.target ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now coding-pet.target
+```
+
+The widget unit is ordered after `graphical-session.target`, and both services use `Restart=on-failure`.
 
 By default coding-pet uses:
 - config dir: `~/.config/coding-pet`

@@ -1,0 +1,17 @@
+[Unit]
+Description=Coding Pet daemon
+After=network.target
+PartOf=coding-pet.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/company/coding-pet
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=%h/company/coding-pet/src
+Environment=XDG_RUNTIME_DIR=%t
+ExecStart=/usr/bin/env python scripts/run_daemon.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
