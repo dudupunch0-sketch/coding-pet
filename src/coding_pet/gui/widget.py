@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from coding_pet.gui.bubble import bubble_text_for_status
+from coding_pet.gui.session_panel import SessionPanelViewModel
 from coding_pet.gui.theme import WidgetTheme, mood_for_status
 from coding_pet.models import SessionStatus
 
@@ -18,6 +19,7 @@ class CodingPetWidgetShell:
     def __init__(self, *, status: SessionStatus, theme: WidgetTheme) -> None:
         self.theme = theme
         self.status = status
+        self.panel = SessionPanelViewModel()
         self.x = 0
         self.y = 0
         self._widget: Any | None = None
@@ -51,6 +53,14 @@ class CodingPetWidgetShell:
     def show(self) -> None:
         if self._widget is not None:
             self._widget.show()
+
+    def open_detail_panel(self) -> SessionStatus:
+        updated = self.panel.open_session(self.status)
+        self.update_status(updated)
+        return updated
+
+    def available_panel_actions(self) -> list[str]:
+        return [action.value for action in self.panel.actions_for(self.status)]
 
     def _setup_qt_widget(self) -> None:
         try:
