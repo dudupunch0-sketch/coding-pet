@@ -120,6 +120,25 @@ class CodingPetWidgetApp:
             if message_limit is not None and processed >= message_limit:
                 break
 
+    async def send_panel_action(
+        self,
+        *,
+        session_id: str,
+        action: str | Any,
+        reply_text: str | None = None,
+    ) -> None:
+        if self._client is None:
+            raise RuntimeError("widget is not connected to the daemon")
+        action_value = action.value if hasattr(action, "value") else str(action)
+        payload: dict[str, str] = {
+            "type": "action_request",
+            "session_id": session_id,
+            "action": action_value,
+        }
+        if reply_text is not None:
+            payload["reply_text"] = reply_text
+        await self._client.send(payload)
+
     async def apply_daemon_message(self, message: dict[str, Any]) -> None:
         message_type = message.get("type")
         if message_type == "snapshot":

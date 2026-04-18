@@ -25,6 +25,8 @@ class SessionPanelRow:
 
 
 class SessionPanelViewModel:
+    QUICK_REPLY_SHORTCUTS = ["keep going", "summarize shortly"]
+
     def rows_for(self, sessions: list[SessionStatus]) -> list[SessionPanelRow]:
         ordered = sorted(sessions, key=lambda status: (-status.attention_score, status.session_id))
         return [
@@ -49,3 +51,8 @@ class SessionPanelViewModel:
         if status.state.name == "NEEDS_INPUT":
             return [PanelAction.SEND_REPLY]
         return [PanelAction.OPEN_WORKSPACE]
+
+    def reply_shortcuts_for(self, status: SessionStatus) -> list[str]:
+        if status.state.name != "NEEDS_INPUT":
+            return []
+        return list(self.QUICK_REPLY_SHORTCUTS)

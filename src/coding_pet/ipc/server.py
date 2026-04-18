@@ -10,12 +10,14 @@ from typing import Any
 from coding_pet.daemon.session_registry import SessionRegistry
 
 SessionCallback = Callable[[dict[str, Any]], Awaitable[None]]
+ActionCallback = Callable[[dict[str, str]], Awaitable[None]]
 
 
 @dataclass(slots=True)
 class IpcServer:
     socket_path: Path
     registry: SessionRegistry
+    action_handler: ActionCallback | None = None
     _server: asyncio.AbstractServer | None = field(init=False, default=None)
     _writers: set[asyncio.StreamWriter] = field(init=False, default_factory=set)
     _unsubscribe: Callable[[], None] | None = field(init=False, default=None)
@@ -57,6 +59,20 @@ class IpcServer:
                 message = json.loads(line)
                 if message.get("type") == "ping":
                     await self._send(writer, {"type": "ping"})
+                elif (
+                    message.get("type") == "action_request"
+                    and self.action_handler is not None
+                    and isinstance(message.get("session_id"), str)
+                    and isinstance(message.get("action"), str)
+                ):
+                    payload: dict[str, str] = {
+                        "type": "action_request",
+                        "session_id": str(message["session_id"]),
+                        "action": str(message["action"]),
+                    }
+                    if isinstance(message.get("reply_text"), str):
+                        payload["reply_text"] = str(message["reply_text"])
+                    await self.action_handler(payload)
         finally:
             self._writers.discard(writer)
             writer.close()

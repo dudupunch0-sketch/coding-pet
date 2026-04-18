@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from coding_pet.gui.bubble import bubble_text_for_status
-from coding_pet.gui.session_panel import SessionPanelViewModel
+from coding_pet.gui.session_panel import PanelAction, SessionPanelViewModel
 from coding_pet.gui.theme import (
     WidgetTheme,
     load_theme_manifest,
@@ -67,6 +67,16 @@ class CodingPetWidgetShell:
 
     def available_panel_actions(self) -> list[str]:
         return [action.value for action in self.panel.actions_for(self.status)]
+
+    def available_reply_shortcuts(self) -> list[str]:
+        return self.panel.reply_shortcuts_for(self.status)
+
+    def build_reply_shortcut_request(self, shortcut: str) -> dict[str, str]:
+        return {
+            "session_id": self.status.session_id,
+            "action": PanelAction.SEND_REPLY.value,
+            "reply_text": shortcut,
+        }
 
     def _setup_qt_widget(self) -> None:
         try:
