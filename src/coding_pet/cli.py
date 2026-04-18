@@ -11,7 +11,9 @@ import typer
 
 from coding_pet.config import load_config
 from coding_pet.daemon.app import DaemonApp
+from coding_pet.daemon.runtime import DaemonRuntime
 from coding_pet.models import AgentKind
+from coding_pet.state_store import StateStore
 
 AGENT_OPTION = typer.Option(..., "--agent", case_sensitive=False)
 CMD_OPTION = typer.Option(..., "--cmd")
@@ -29,19 +31,31 @@ app.add_typer(widget_app, name="widget")
 app.add_typer(admin_app, name="admin")
 
 
+async def _serve_daemon_runtime(*, oneshot: bool) -> DaemonRuntime:
+    config = load_config()
+    runtime = DaemonRuntime(
+        runtime_dir=config.runtime_dir,
+        state_store=StateStore(config.state_file),
+    )
+    ready_message = (
+        "coding-pet daemon ready "
+        f"runtime_dir={config.runtime_dir} "
+        f"state_file={config.state_file} "
+        f"socket_path={runtime.socket_path}"
+    )
+    typer.echo(
+        ready_message
+    )
+    await runtime.serve(oneshot=oneshot)
+    return runtime
+
+
 @daemon_app.command("run")
 def daemon_run() -> None:
     """Run the Coding Pet daemon."""
-    config = load_config()
-    config.runtime_dir.mkdir(parents=True, exist_ok=True)
-    typer.echo(
-        "coding-pet daemon ready "
-        f"runtime_dir={config.runtime_dir} state_file={config.state_file}"
-    )
-    if os.getenv("CODING_PET_DAEMON_ONESHOT") in {"1", "true", "yes", "on"}:
-        return
+    oneshot = os.getenv("CODING_PET_DAEMON_ONESHOT") in {"1", "true", "yes", "on"}
     try:
-        asyncio.run(asyncio.Event().wait())
+        asyncio.run(_serve_daemon_runtime(oneshot=oneshot))
     except KeyboardInterrupt:
         typer.echo("coding-pet daemon stopped")
 

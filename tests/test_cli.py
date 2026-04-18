@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
 from typer.testing import CliRunner
 
 from coding_pet.cli import app
@@ -7,7 +10,10 @@ from coding_pet.cli import app
 runner = CliRunner()
 
 
-def test_daemon_run_reports_runtime_details_and_can_exit_immediately(monkeypatch, tmp_path) -> None:
+def test_daemon_run_reports_runtime_details_and_can_exit_immediately(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("CODING_PET_DAEMON_ONESHOT", "1")
 
@@ -18,7 +24,10 @@ def test_daemon_run_reports_runtime_details_and_can_exit_immediately(monkeypatch
     assert "state_file=" in result.stdout
 
 
-def test_widget_run_reports_environment_status(monkeypatch, tmp_path) -> None:
+def test_widget_run_reports_environment_status(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
 
     result = runner.invoke(app, ["widget", "run"])
@@ -27,7 +36,10 @@ def test_widget_run_reports_environment_status(monkeypatch, tmp_path) -> None:
     assert "coding-pet widget" in result.stdout.lower()
 
 
-def test_admin_doctor_prints_live_configuration(monkeypatch, tmp_path) -> None:
+def test_admin_doctor_prints_live_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("CODING_PET_LOG_LEVEL", "debug")
 

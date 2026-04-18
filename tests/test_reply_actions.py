@@ -36,9 +36,9 @@ def test_session_panel_exposes_reply_shortcuts_for_input_sessions() -> None:
 @pytest.mark.asyncio
 async def test_widget_app_sends_reply_shortcut_action_over_ipc(tmp_path: Path) -> None:
     registry = SessionRegistry()
-    received: list[dict[str, str]] = []
+    received: list[dict[str, object]] = []
 
-    async def handle_action(message: dict[str, str]) -> None:
+    async def handle_action(message: dict[str, object]) -> None:
         received.append(message)
 
     server = IpcServer(

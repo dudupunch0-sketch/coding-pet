@@ -75,9 +75,13 @@ async def test_registry_updates_one_session_without_touching_others() -> None:
             title="updated",
         )
     )
+    left = await registry.get("s1")
+    right = await registry.get("s2")
 
-    assert (await registry.get("s1")).title == "updated"
-    assert (await registry.get("s2")).title == "untouched"
+    assert left is not None
+    assert right is not None
+    assert left.title == "updated"
+    assert right.title == "untouched"
 
 
 @pytest.mark.asyncio
@@ -143,7 +147,9 @@ async def test_registry_marks_sessions_read_and_removes_them() -> None:
 
     await registry.upsert(unread)
     await registry.mark_read("s1")
-    assert (await registry.get("s1")).unread is False
+    marked = await registry.get("s1")
+    assert marked is not None
+    assert marked.unread is False
 
     removed = await registry.remove("s1")
     assert removed is True

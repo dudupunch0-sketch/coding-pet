@@ -3,10 +3,15 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import pytest
+
 from coding_pet.config import AppConfig, load_config
 
 
-def test_load_config_uses_xdg_directories(monkeypatch, tmp_path: Path) -> None:
+def test_load_config_uses_xdg_directories(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
@@ -20,7 +25,10 @@ def test_load_config_uses_xdg_directories(monkeypatch, tmp_path: Path) -> None:
     assert config.log_dir == config.state_dir / "logs"
 
 
-def test_load_config_prefers_run_user_uid_when_available(monkeypatch, tmp_path: Path) -> None:
+def test_load_config_prefers_run_user_uid_when_available(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     runtime_root = Path("/run/user") / str(os.getuid())
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
@@ -33,7 +41,7 @@ def test_load_config_prefers_run_user_uid_when_available(monkeypatch, tmp_path: 
 
 
 def test_load_config_falls_back_to_state_runtime_when_run_user_missing(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
@@ -46,7 +54,10 @@ def test_load_config_falls_back_to_state_runtime_when_run_user_missing(
     assert config.runtime_dir == tmp_path / ".local/state" / "coding-pet" / "runtime"
 
 
-def test_environment_overrides_win(monkeypatch, tmp_path: Path) -> None:
+def test_environment_overrides_win(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     override_dir = tmp_path / "custom-config"
     monkeypatch.setenv("CODING_PET_CONFIG_DIR", str(override_dir))
 

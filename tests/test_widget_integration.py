@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -46,7 +47,8 @@ async def test_widget_app_applies_snapshot_and_incremental_updates(tmp_path: Pat
         await registry.remove("beta")
         await asyncio.sleep(0.05)
 
-        assert app.widgets["alpha"].status.state is AttentionState.COMPLETED
+        alpha_state = cast(AttentionState, app.widgets["alpha"].status.state)
+        assert alpha_state == AttentionState.COMPLETED
         assert "beta" not in app.widgets
     finally:
         await app.disconnect_from_daemon()

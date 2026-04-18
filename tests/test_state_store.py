@@ -93,7 +93,10 @@ async def test_registry_persistence_hook_writes_snapshot(tmp_path: Path) -> None
     assert restored[0].state is AttentionState.REVIEW_NEEDED
 
 
-def test_load_config_exposes_default_state_file(monkeypatch, tmp_path: Path) -> None:
+def test_load_config_exposes_default_state_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.delenv("CODING_PET_STATE_FILE", raising=False)
 

@@ -87,11 +87,17 @@ async def test_one_completion_does_not_stop_other_sessions() -> None:
     )
 
     await asyncio.sleep(0.05)
-    assert (await registry.get("fast")).state is AttentionState.COMPLETED
-    assert (await registry.get("slow")).state is AttentionState.RUNNING
+    fast_status = await registry.get("fast")
+    slow_status = await registry.get("slow")
+    assert fast_status is not None
+    assert slow_status is not None
+    assert fast_status.state is AttentionState.COMPLETED
+    assert slow_status.state is AttentionState.RUNNING
 
     await manager.wait_for_all()
-    assert (await registry.get("slow")).state is AttentionState.COMPLETED
+    slow_status = await registry.get("slow")
+    assert slow_status is not None
+    assert slow_status.state is AttentionState.COMPLETED
 
 
 @pytest.mark.asyncio
@@ -139,8 +145,12 @@ async def test_stall_detection_is_independent_per_session() -> None:
     )
 
     await asyncio.sleep(0.15)
-    assert (await registry.get("stalling")).state is AttentionState.STALLED
-    assert (await registry.get("busy")).state in {AttentionState.RUNNING, AttentionState.COMPLETED}
+    stalling_status = await registry.get("stalling")
+    busy_status = await registry.get("busy")
+    assert stalling_status is not None
+    assert busy_status is not None
+    assert stalling_status.state is AttentionState.STALLED
+    assert busy_status.state in {AttentionState.RUNNING, AttentionState.COMPLETED}
 
     await manager.wait_for_all()
 

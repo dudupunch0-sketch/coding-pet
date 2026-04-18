@@ -5,8 +5,10 @@ from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime, timedelta
 
 from coding_pet.agents.base import AgentAdapter
+from coding_pet.daemon.action_router import SessionActionRequest
 from coding_pet.daemon.monitor import MonitorTask, ProcessHandle
 from coding_pet.daemon.session_registry import SessionRegistry
+from coding_pet.logging import ContextAdapter, get_logger
 from coding_pet.models import AttentionState, SessionStatus
 from coding_pet.notifiers.base import Notification, Notifier
 from coding_pet.notifiers.desktop import DesktopNotifier
@@ -33,6 +35,7 @@ class MonitorManager:
         self._last_notified_at: dict[tuple[str, AttentionState], datetime] = {}
         self._completed_notified: set[str] = set()
         self._unsubscribe: Callable[[], None] | None = None
+        self._logger: ContextAdapter = get_logger("daemon.manager")
         self._unsubscribe = self.registry.subscribe(self._handle_registry_message)
 
     async def start_session(
@@ -74,6 +77,20 @@ class MonitorManager:
         if not self._tasks:
             return
         await asyncio.gather(*self._tasks.values())
+
+    async def stop_all_sessions(self) -> None:
+        for session_id in list(self._tasks):
+            await self.stop_session(session_id)
+
+    def has_live_session(self, session_id: str) -> bool:
+        task = self._tasks.get(session_id)
+        return task is not None and not task.done()
+
+    async def route_action(self, request: SessionActionRequest) -> None:
+        self._logger.warning(
+            "Session action received before live control channel exists",
+            extra={"session_id": request.session_id},
+        )
 
     async def restore_from_store(self) -> list[SessionStatus]:
         if self.state_store is None:

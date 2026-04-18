@@ -10,7 +10,7 @@ from typing import Any
 from coding_pet.daemon.session_registry import SessionRegistry
 
 SessionCallback = Callable[[dict[str, Any]], Awaitable[None]]
-ActionCallback = Callable[[dict[str, str]], Awaitable[None]]
+ActionCallback = Callable[[dict[str, object]], Awaitable[None]]
 
 
 @dataclass(slots=True)
@@ -59,19 +59,11 @@ class IpcServer:
                 message = json.loads(line)
                 if message.get("type") == "ping":
                     await self._send(writer, {"type": "ping"})
-                elif (
-                    message.get("type") == "action_request"
-                    and self.action_handler is not None
-                    and isinstance(message.get("session_id"), str)
-                    and isinstance(message.get("action"), str)
-                ):
-                    payload: dict[str, str] = {
-                        "type": "action_request",
-                        "session_id": str(message["session_id"]),
-                        "action": str(message["action"]),
-                    }
-                    if isinstance(message.get("reply_text"), str):
-                        payload["reply_text"] = str(message["reply_text"])
+                elif message.get("type") == "action_request" and self.action_handler is not None:
+                    payload: dict[str, object] = {"type": "action_request"}
+                    for key in ("session_id", "action", "reply_text"):
+                        if key in message:
+                            payload[key] = message[key]
                     await self.action_handler(payload)
         finally:
             self._writers.discard(writer)
