@@ -3,11 +3,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import tempfile
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
+from coding_pet.agents.claude_code import ClaudeCodeAdapter
 from coding_pet.daemon.action_router import SessionActionRequest, SessionActionRouter
 from coding_pet.daemon.runtime import (
     MAX_SOCKET_PATH_BYTES,
@@ -18,6 +20,22 @@ from coding_pet.daemon.session_registry import SessionRegistry
 from coding_pet.ipc.client import IpcClient
 from coding_pet.models import AgentKind, AttentionState, SessionStatus
 from coding_pet.state_store import StateStore
+
+
+class FakeProcess:
+    def __init__(self, *, exit_code: int = 0, exit_delay: float = 5.0) -> None:
+        self.exit_code = exit_code
+        self.exit_delay = exit_delay
+
+    async def wait(self) -> int:
+        await asyncio.sleep(self.exit_delay)
+        return self.exit_code
+
+
+async def delayed_lines(*items: tuple[float, str]) -> AsyncIterator[str]:
+    for delay, line in items:
+        await asyncio.sleep(delay)
+        yield line
 
 
 def build_status(session_id: str, state: AttentionState) -> SessionStatus:
@@ -138,3 +156,51 @@ async def test_daemon_runtime_routes_action_requests_through_router(tmp_path: Pa
             reply_text="keep going",
         )
     ]
+
+
+@pytest.mark.asyncio
+async def test_daemon_runtime_routes_reply_into_live_session_handler(tmp_path: Path) -> None:
+    registry = SessionRegistry()
+    state_store = StateStore(tmp_path / "state.json")
+    runtime = DaemonRuntime(
+        runtime_dir=tmp_path / ("deep-runtime-segment-" * 12),
+        state_store=state_store,
+        registry=registry,
+    )
+    delivered: list[str] = []
+    delivered_event = asyncio.Event()
+
+    async def reply_handler(reply_text: str) -> None:
+        delivered.append(reply_text)
+        delivered_event.set()
+
+    await runtime.start()
+    assert runtime.manager is not None
+    await runtime.manager.start_session(
+        session_id="live-2",
+        adapter=ClaudeCodeAdapter(),
+        workspace="/tmp/live-2",
+        title="live-2",
+        output_lines=delayed_lines((1.0, "waiting")),
+        process=FakeProcess(),
+        reply_handler=reply_handler,
+    )
+    client = IpcClient(runtime.socket_path)
+
+    try:
+        await client.connect()
+        await client.read_message()
+        await client.send(
+            {
+                "type": "action_request",
+                "session_id": "live-2",
+                "action": "send_reply",
+                "reply_text": "summarize shortly",
+            }
+        )
+        await asyncio.wait_for(delivered_event.wait(), timeout=1)
+    finally:
+        await client.close()
+        await runtime.stop()
+
+    assert delivered == ["summarize shortly"]
