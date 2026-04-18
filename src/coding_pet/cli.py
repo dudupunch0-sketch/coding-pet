@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import shutil
 import uuid
+from datetime import UTC, datetime
+from pathlib import Path
 
 import typer
 
+from coding_pet.config import load_config
 from coding_pet.daemon.app import DaemonApp
 from coding_pet.models import AgentKind
 
@@ -27,8 +32,18 @@ app.add_typer(admin_app, name="admin")
 @daemon_app.command("run")
 def daemon_run() -> None:
     """Run the Coding Pet daemon."""
-    typer.echo("Daemon service startup is not implemented yet.")
-    raise typer.Exit(code=1)
+    config = load_config()
+    config.runtime_dir.mkdir(parents=True, exist_ok=True)
+    typer.echo(
+        "coding-pet daemon ready "
+        f"runtime_dir={config.runtime_dir} state_file={config.state_file}"
+    )
+    if os.getenv("CODING_PET_DAEMON_ONESHOT") in {"1", "true", "yes", "on"}:
+        return
+    try:
+        asyncio.run(asyncio.Event().wait())
+    except KeyboardInterrupt:
+        typer.echo("coding-pet daemon stopped")
 
 
 @daemon_app.command("monitor")
@@ -57,15 +72,45 @@ def daemon_monitor(
 @widget_app.command("run")
 def widget_run() -> None:
     """Run the Coding Pet widget layer."""
-    typer.echo("Widget runtime is not implemented yet.")
-    raise typer.Exit(code=1)
+    config = load_config()
+    typer.echo(
+        "coding-pet widget "
+        f"runtime_dir={config.runtime_dir} state_file={config.state_file}"
+    )
+    from coding_pet.gui.app import CodingPetWidgetApp
+    from coding_pet.models import AgentKind, AttentionState, SessionStatus
+
+    app = CodingPetWidgetApp()
+    demo = SessionStatus(
+        session_id="demo",
+        agent_kind=AgentKind.CLAUDE_CODE,
+        title="Demo Session",
+        workspace=str(Path.cwd()),
+        state=AttentionState.NEEDS_PERMISSION,
+        summary="Waiting for approval to apply changes.",
+        last_event_at=datetime.now(UTC),
+    )
+    try:
+        qt_app = app.ensure_app()
+    except Exception:
+        typer.echo("PySide6 GUI runtime is unavailable in this environment.")
+        return
+    app.show_sessions([demo])
+    raise typer.Exit(code=qt_app.exec())
 
 
 @admin_app.command("doctor")
 def admin_doctor() -> None:
     """Run basic environment diagnostics."""
-    typer.echo("Diagnostics are not implemented yet.")
-    raise typer.Exit(code=1)
+    config = load_config()
+    typer.echo(f"config_dir={config.config_dir}")
+    typer.echo(f"state_dir={config.state_dir}")
+    typer.echo(f"runtime_dir={config.runtime_dir}")
+    typer.echo(f"state_file={config.state_file}")
+    typer.echo(f"log_dir={config.log_dir}")
+    typer.echo(f"log_level={config.log_level}")
+    typer.echo(f"python={shutil.which('python') or shutil.which('python3') or 'unavailable'}")
+    typer.echo(f"notify_send={shutil.which('notify-send') or 'unavailable'}")
 
 
 def main() -> None:
