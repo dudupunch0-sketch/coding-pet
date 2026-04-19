@@ -1,6 +1,12 @@
 # Next Implementation Plan
 
-Last updated: 2026-04-18
+Last updated: 2026-04-19
+
+> Note: this earlier live-control-loop plan was written before we split execution into two server-specific tracks.
+> Use these newer plans as the primary source of truth:
+> - `docs/architecture/current-server-hardening-plan.md`
+> - `docs/architecture/future-agent-enabled-server-plan.md`
+> This file is now historical context for the live-control-loop work that has already been largely completed.
 
 ## Objective
 
