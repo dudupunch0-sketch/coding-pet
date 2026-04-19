@@ -23,6 +23,8 @@ Files:
 - `src/coding_pet/daemon/monitor.py`
 - `src/coding_pet/daemon/manager.py`
 - `src/coding_pet/daemon/app.py`
+- `src/coding_pet/daemon/runtime.py`
+- `src/coding_pet/daemon/action_router.py`
 - `src/coding_pet/daemon/session_registry.py`
 
 Responsibilities:
@@ -31,6 +33,8 @@ Responsibilities:
 - maintain a concurrent in-memory session registry
 - notify users on important state transitions
 - persist snapshots to disk for restart recovery
+- validate and route widget action requests through a daemon-owned control path
+- distinguish live sessions from restored snapshot-only sessions
 
 ### 3. Models and events
 Files:
@@ -58,11 +62,13 @@ Supported message types:
 - `snapshot`
 - `session_updated`
 - `session_removed`
+- `action_result`
 - `ping`
 
 Behavior:
 - a new widget receives a full snapshot first
 - later updates stream incrementally
+- widget action requests are sent back over the same socket and acknowledged with `action_result`
 - reconnecting widgets can rebuild state without restarting the daemon
 
 ### 5. Widget layer
@@ -78,6 +84,8 @@ Responsibilities:
 - keep a stable multi-pet layout on screen
 - expose a shared panel view model for urgent sessions and actions
 - bootstrap from persisted snapshot before live IPC updates arrive
+- render transient success/failure action feedback without overwriting the real session summary
+- treat restored snapshot sessions as read-only in the panel
 
 Current implementation notes:
 - the shell supports a PySide6-backed UI when runtime libraries are present
@@ -100,7 +108,7 @@ File:
 
 Responsibilities:
 - store the latest session snapshot in JSON form
-- restore known sessions after restart
+- restore known sessions after restart as non-live/read-only state
 - provide widget bootstrap state before the daemon socket is available
 
 Default path:
@@ -108,13 +116,16 @@ Default path:
 
 ## Data flow
 
-1. CLI or future daemon service launches a monitored agent command.
+1. CLI or daemon service launches a monitored agent command.
 2. `MonitorTask` reads stdout/stderr lines asynchronously.
 3. `OutputClassifier` converts lines and exits into `AttentionState` changes.
 4. `SessionRegistry` updates the latest `SessionStatus`.
 5. `MonitorManager` reacts to registry updates for notifications and persistence.
 6. `IpcServer` broadcasts snapshots and incremental updates.
 7. `CodingPetWidgetApp` receives IPC messages, updates widget shells, and reflows the layout.
+8. Panel actions such as `send_reply`, `approve`, and `reject` are sent back to the daemon as `action_request` messages.
+9. `SessionActionRouter` validates those requests and `MonitorManager` dispatches them through the live session control handler.
+10. The widget receives `action_result` acknowledgements and shows transient UI feedback until newer session output arrives.
 
 ## Concurrency model
 
@@ -127,11 +138,12 @@ Default path:
 
 - daemon-side snapshot persistence writes the latest session set to disk
 - widget can load the snapshot before it connects to the daemon socket
+- restored snapshot sessions are treated as non-live/read-only until a live daemon snapshot replaces them
 - reconnecting IPC clients receive a fresh snapshot immediately
+- reconnect clears stale action feedback so the snapshot becomes the source of truth again
 
 ## Current gaps
 
-- full daemon service orchestration is still placeholder-level
-- widget panel actions are not yet routed back into live agents
-- sprite/theme assets are placeholder quality
-- packaging/systemd integration is still pending
+- actual agent-native approval/rejection semantics are still stdin-string based placeholders rather than proven per-agent protocols
+- the PySide6 environment on this host is still unavailable for real manual GUI runs, so some UX work remains test-driven only
+- sprite/theme assets are still placeholder quality

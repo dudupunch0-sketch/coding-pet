@@ -50,17 +50,27 @@ Daemon help:
 PYTHONPATH=src python -m coding_pet.cli daemon --help
 ```
 
+Widget help:
+```bash
+PYTHONPATH=src python -m coding_pet.cli widget --help
+```
+
 Daemon monitor help:
 ```bash
 PYTHONPATH=src python -m coding_pet.cli daemon monitor --help
 ```
 
-Widget demo:
+Admin doctor help:
+```bash
+PYTHONPATH=src python -m coding_pet.cli admin doctor --help
+```
+
+Widget script demo:
 ```bash
 PYTHONPATH=src python scripts/run_widget.py
 ```
 
-Daemon placeholder bootstrap:
+Daemon runtime bootstrap:
 ```bash
 PYTHONPATH=src python scripts/run_daemon.py
 ```
@@ -83,7 +93,7 @@ PYTHONPATH=src python -m coding_pet.cli daemon monitor \
   --workspace /repos/b
 ```
 
-This validates the current monitor command path. A full long-running service wrapper is still pending.
+This validates the current monitor command path, and the repository also ships a long-running `daemon run` path plus a widget runtime that prefers connecting to the live daemon socket when available.
 
 ## Files and paths
 
@@ -154,8 +164,7 @@ This avoids importing an older editable install from a different checkout.
 
 ## Current limitations
 
-- `daemon run` is still a placeholder
-- `widget run` is still a placeholder
-- panel actions are not yet routed back to the monitored process
-- systemd user services are not yet defined
+- the action transport into live sessions currently writes simple adapter-defined control messages to monitored process stdin; this still needs validation against real Claude Code/OpenCode workflows
+- the GUI shell still depends on a full PySide6/Qt runtime, which is unavailable in the current headless test environment
+- restored snapshot sessions are intentionally read-only until a live daemon connection replaces them with active sessions
 - asset/theme pack is still placeholder quality

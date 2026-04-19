@@ -23,10 +23,13 @@ Implemented today:
 - JSON state persistence for restart resilience
 - packaged systemd user-service unit files
 - theme manifest and asset validation pipeline
+- `daemon run`, `widget run`, and `admin doctor` CLI runtime commands
+- daemon-owned live action routing for `send_reply`, `approve`, and `reject`
+- explicit widget action feedback plus read-only restored-session handling
 
 Still in progress:
-- full daemon service runtime
-- full widget runtime command integration
+- validating agent-specific control semantics against real Claude Code/OpenCode behavior
+- richer manual GUI UX polish in a full PySide6 environment
 - production sprite assets
 
 ## Packaging and user services
@@ -84,12 +87,17 @@ Show daemon monitor command help:
 PYTHONPATH=src python -m coding_pet.cli daemon monitor --help
 ```
 
-Run the widget demo shell:
+Run the widget layer:
+```bash
+PYTHONPATH=src python -m coding_pet.cli widget run
+```
+
+Run the widget script demo shell:
 ```bash
 PYTHONPATH=src python scripts/run_widget.py
 ```
 
-Run the daemon placeholder bootstrap:
+Run the daemon runtime bootstrap:
 ```bash
 PYTHONPATH=src python scripts/run_daemon.py
 ```
@@ -135,7 +143,7 @@ Useful overrides:
 
 ## Current limitations
 
-- `python -m coding_pet.cli daemon run` is still a placeholder
-- `python -m coding_pet.cli widget run` is still a placeholder
+- `python -m coding_pet.cli daemon run` and `widget run` now exist, but the current host still lacks a real PySide6/Qt runtime for manual GUI exercise
+- live panel actions are routed through adapter-defined stdin control messages; per-agent approval/rejection semantics still need validation against real Claude Code/OpenCode sessions
+- restored snapshot sessions are intentionally read-only until a live daemon snapshot replaces them
 - the GUI shell falls back gracefully when PySide6 runtime libraries are unavailable
-- panel actions are modeled in the UI layer but not yet routed back into live monitored sessions
