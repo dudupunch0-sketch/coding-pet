@@ -95,6 +95,7 @@ class CodingPetWidgetApp:
         if self.socket_path is None:
             raise RuntimeError("socket_path is required for daemon connectivity")
         self._ready.clear()
+        self.last_action_result = None
         self._client = IpcClient(self.socket_path)
         await self._client.connect()
         self._listen_task = asyncio.create_task(self._listen_to_daemon(message_limit=message_limit))
@@ -145,6 +146,7 @@ class CodingPetWidgetApp:
     async def apply_daemon_message(self, message: dict[str, Any]) -> None:
         message_type = message.get("type")
         if message_type == "snapshot":
+            self.last_action_result = None
             sessions = [SessionStatus.model_validate(item) for item in message.get("sessions", [])]
             self.show_sessions(sessions)
             return

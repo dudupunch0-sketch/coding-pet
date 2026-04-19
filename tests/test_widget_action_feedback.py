@@ -124,6 +124,41 @@ async def test_widget_clears_action_feedback_when_new_session_output_arrives(
 
 
 @pytest.mark.asyncio
+async def test_widget_reconnect_clears_stale_action_feedback(tmp_path: Path) -> None:
+    registry = SessionRegistry()
+    await registry.upsert(build_status("alpha", AttentionState.NEEDS_INPUT))
+    server = IpcServer(socket_path=tmp_path / "coding-pet.sock", registry=registry)
+    await server.start()
+
+    try:
+        app = CodingPetWidgetApp(socket_path=server.socket_path)
+        await app.connect_to_daemon(message_limit=1)
+        await app.apply_daemon_message(
+            {
+                "type": "action_result",
+                "session_id": "alpha",
+                "action": "send_reply",
+                "ok": True,
+                "detail": "keep going delivered",
+            }
+        )
+        assert app.last_action_result is not None
+        assert (
+            app.widgets["alpha"].presentation().bubble_text
+            == "Action sent: keep going delivered"
+        )
+
+        await app.disconnect_from_daemon()
+        await app.connect_to_daemon(message_limit=1)
+
+        assert app.last_action_result is None
+        assert app.widgets["alpha"].presentation().bubble_text == "alpha:needs_input"
+    finally:
+        await app.disconnect_from_daemon()
+        await server.stop()
+
+
+@pytest.mark.asyncio
 async def test_widget_app_sends_reply_and_receives_success_feedback(tmp_path: Path) -> None:
     registry = SessionRegistry()
     await registry.upsert(build_status("alpha", AttentionState.NEEDS_INPUT))
