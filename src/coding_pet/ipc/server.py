@@ -10,7 +10,7 @@ from typing import Any
 from coding_pet.daemon.session_registry import SessionRegistry
 
 SessionCallback = Callable[[dict[str, Any]], Awaitable[None]]
-ActionCallback = Callable[[dict[str, object]], Awaitable[None]]
+ActionCallback = Callable[[dict[str, object]], Awaitable[dict[str, object] | None]]
 
 
 @dataclass(slots=True)
@@ -64,7 +64,9 @@ class IpcServer:
                     for key in ("session_id", "action", "reply_text"):
                         if key in message:
                             payload[key] = message[key]
-                    await self.action_handler(payload)
+                    result = await self.action_handler(payload)
+                    if result is not None:
+                        await self._send(writer, result)
         finally:
             self._writers.discard(writer)
             writer.close()

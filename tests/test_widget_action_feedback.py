@@ -1,0 +1,95 @@
+from __future__ import annotations
+
+import asyncio
+from pathlib import Path
+
+import pytest
+
+from coding_pet.daemon.session_registry import SessionRegistry
+from coding_pet.gui.app import CodingPetWidgetApp
+from coding_pet.ipc.server import IpcServer
+from coding_pet.models import AgentKind, AttentionState, SessionStatus
+
+
+def build_status(session_id: str, state: AttentionState) -> SessionStatus:
+    from datetime import UTC, datetime
+
+    return SessionStatus(
+        session_id=session_id,
+        agent_kind=AgentKind.CLAUDE_CODE,
+        title=session_id,
+        workspace=f"/tmp/{session_id}",
+        state=state,
+        summary=f"{session_id}:{state.value}",
+        last_event_at=datetime.now(UTC),
+    )
+
+
+@pytest.mark.asyncio
+async def test_widget_receives_action_result_message(tmp_path: Path) -> None:
+    registry = SessionRegistry()
+    server = IpcServer(socket_path=tmp_path / "coding-pet.sock", registry=registry)
+    await server.start()
+
+    try:
+        app = CodingPetWidgetApp(socket_path=server.socket_path)
+        await app.connect_to_daemon(message_limit=1)
+        await app.apply_daemon_message(
+            {
+                "type": "action_result",
+                "session_id": "alpha",
+                "action": "send_reply",
+                "ok": True,
+                "detail": "keep going delivered",
+            }
+        )
+
+        assert app.last_action_result == {
+            "session_id": "alpha",
+            "action": "send_reply",
+            "ok": True,
+            "detail": "keep going delivered",
+            "type": "action_result",
+        }
+    finally:
+        await app.disconnect_from_daemon()
+        await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_widget_app_sends_reply_and_receives_success_feedback(tmp_path: Path) -> None:
+    registry = SessionRegistry()
+    await registry.upsert(build_status("alpha", AttentionState.NEEDS_INPUT))
+
+    async def handle_action(message: dict[str, object]) -> dict[str, object]:
+        return {
+            "type": "action_result",
+            "session_id": str(message["session_id"]),
+            "action": str(message["action"]),
+            "ok": True,
+            "detail": f"{message.get('reply_text', '')} delivered",
+        }
+
+    server = IpcServer(
+        socket_path=tmp_path / "coding-pet.sock",
+        registry=registry,
+        action_handler=handle_action,
+    )
+    await server.start()
+
+    try:
+        app = CodingPetWidgetApp(socket_path=server.socket_path)
+        await app.connect_to_daemon(message_limit=2)
+        await app.send_panel_action(
+            session_id="alpha",
+            action="send_reply",
+            reply_text="summarize shortly",
+        )
+        await asyncio.sleep(0.05)
+
+        assert app.last_action_result is not None
+        assert app.last_action_result["ok"] is True
+        assert app.last_action_result["detail"] == "summarize shortly delivered"
+    finally:
+        await app.disconnect_from_daemon()
+        await server.stop()

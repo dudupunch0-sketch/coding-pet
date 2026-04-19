@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
 from coding_pet.agents.base import AgentAdapter
-from coding_pet.daemon.action_router import SessionActionRequest
+from coding_pet.daemon.action_router import ActionResult, SessionActionRequest
 from coding_pet.daemon.monitor import MonitorTask, ProcessHandle
 from coding_pet.daemon.session_registry import SessionRegistry
 from coding_pet.logging import ContextAdapter, get_logger
@@ -93,7 +93,7 @@ class MonitorManager:
         task = self._tasks.get(session_id)
         return task is not None and not task.done()
 
-    async def route_action(self, request: SessionActionRequest) -> None:
+    async def route_action(self, request: SessionActionRequest) -> ActionResult:
         if request.action == "send_reply":
             handler = self._reply_handlers.get(request.session_id)
             if handler is None:
@@ -101,15 +101,34 @@ class MonitorManager:
                     "Session reply requested without live control channel",
                     extra={"session_id": request.session_id},
                 )
-                return
+                return {
+                    "type": "action_result",
+                    "session_id": request.session_id,
+                    "action": request.action,
+                    "ok": False,
+                    "detail": "session has no live reply channel",
+                }
             assert request.reply_text is not None
             await handler(request.reply_text)
-            return
+            return {
+                "type": "action_result",
+                "session_id": request.session_id,
+                "action": request.action,
+                "ok": True,
+                "detail": f"{request.reply_text} delivered",
+            }
 
         self._logger.warning(
             "Session action is not yet supported by live control channel",
             extra={"session_id": request.session_id, "action": request.action},
         )
+        return {
+            "type": "action_result",
+            "session_id": request.session_id,
+            "action": request.action,
+            "ok": False,
+            "detail": f"{request.action} is not implemented yet",
+        }
 
     async def restore_from_store(self) -> list[SessionStatus]:
         if self.state_store is None:

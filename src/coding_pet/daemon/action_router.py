@@ -7,8 +7,9 @@ from typing import Literal, cast
 from coding_pet.daemon.session_registry import SessionRegistry
 from coding_pet.logging import ContextAdapter, get_logger
 
+ActionResult = dict[str, object]
 SupportedAction = Literal["send_reply", "approve", "reject"]
-DispatchAction = Callable[["SessionActionRequest"], Awaitable[None]]
+DispatchAction = Callable[["SessionActionRequest"], Awaitable[ActionResult]]
 LiveSessionLookup = Callable[[str], bool]
 
 _SUPPORTED_ACTIONS = frozenset({"send_reply", "approve", "reject"})
@@ -56,25 +57,43 @@ class SessionActionRouter:
     def __post_init__(self) -> None:
         self._logger = get_logger("daemon.action_router")
 
-    async def handle_message(self, message: dict[str, object]) -> None:
+    async def handle_message(self, message: dict[str, object]) -> ActionResult:
         try:
             request = SessionActionRequest.from_message(message)
         except ValueError as exc:
             self._logger.warning("Rejected malformed action request: %s", exc)
-            return
+            return {
+                "type": "action_result",
+                "session_id": str(message.get("session_id", "")),
+                "action": str(message.get("action", "")),
+                "ok": False,
+                "detail": str(exc),
+            }
 
         if await self.registry.get(request.session_id) is None:
             self._logger.warning(
                 "Rejected action for missing session",
                 extra={"session_id": request.session_id},
             )
-            return
+            return {
+                "type": "action_result",
+                "session_id": request.session_id,
+                "action": request.action,
+                "ok": False,
+                "detail": "session not found",
+            }
 
         if not self.is_session_live(request.session_id):
             self._logger.warning(
                 "Rejected action for inactive session",
                 extra={"session_id": request.session_id},
             )
-            return
+            return {
+                "type": "action_result",
+                "session_id": request.session_id,
+                "action": request.action,
+                "ok": False,
+                "detail": "session is not live",
+            }
 
-        await self.dispatch_action(request)
+        return await self.dispatch_action(request)

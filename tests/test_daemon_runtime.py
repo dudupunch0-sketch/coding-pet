@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from coding_pet.agents.claude_code import ClaudeCodeAdapter
-from coding_pet.daemon.action_router import SessionActionRequest, SessionActionRouter
+from coding_pet.daemon.action_router import ActionResult, SessionActionRequest, SessionActionRouter
 from coding_pet.daemon.runtime import (
     MAX_SOCKET_PATH_BYTES,
     DaemonRuntime,
@@ -83,8 +83,15 @@ async def test_session_action_router_rejects_inactive_sessions(
     await registry.upsert(build_status("restored-1", AttentionState.NEEDS_INPUT))
     routed: list[SessionActionRequest] = []
 
-    async def dispatch_action(request: SessionActionRequest) -> None:
+    async def dispatch_action(request: SessionActionRequest) -> ActionResult:
         routed.append(request)
+        return {
+            "type": "action_result",
+            "session_id": request.session_id,
+            "action": request.action,
+            "ok": True,
+            "detail": "should not route",
+        }
 
     router = SessionActionRouter(
         registry=registry,
@@ -113,9 +120,16 @@ async def test_daemon_runtime_routes_action_requests_through_router(tmp_path: Pa
     routed: list[SessionActionRequest] = []
     routed_event = asyncio.Event()
 
-    async def dispatch_action(request: SessionActionRequest) -> None:
+    async def dispatch_action(request: SessionActionRequest) -> ActionResult:
         routed.append(request)
         routed_event.set()
+        return {
+            "type": "action_result",
+            "session_id": request.session_id,
+            "action": request.action,
+            "ok": True,
+            "detail": "routed",
+        }
 
     router = SessionActionRouter(
         registry=registry,

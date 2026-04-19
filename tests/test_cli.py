@@ -34,6 +34,22 @@ def test_widget_run_reports_environment_status(
 
     assert result.exit_code == 0
     assert "coding-pet widget" in result.stdout.lower()
+    assert "live_mode=false" in result.stdout.lower()
+
+
+def test_widget_run_reports_live_mode_when_socket_exists(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    runtime_dir = tmp_path / ".local/state" / "coding-pet" / "runtime"
+    runtime_dir.mkdir(parents=True)
+    (runtime_dir / "coding-pet.sock").write_text("placeholder", encoding="utf-8")
+
+    result = runner.invoke(app, ["widget", "run"])
+
+    assert result.exit_code == 0
+    assert "live_mode=true" in result.stdout.lower()
 
 
 def test_admin_doctor_prints_live_configuration(

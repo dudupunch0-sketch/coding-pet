@@ -87,29 +87,44 @@ def daemon_monitor(
 def widget_run() -> None:
     """Run the Coding Pet widget layer."""
     config = load_config()
-    typer.echo(
-        "coding-pet widget "
-        f"runtime_dir={config.runtime_dir} state_file={config.state_file}"
-    )
     from coding_pet.gui.app import CodingPetWidgetApp
     from coding_pet.models import AgentKind, AttentionState, SessionStatus
 
-    app = CodingPetWidgetApp()
-    demo = SessionStatus(
-        session_id="demo",
-        agent_kind=AgentKind.CLAUDE_CODE,
-        title="Demo Session",
-        workspace=str(Path.cwd()),
-        state=AttentionState.NEEDS_PERMISSION,
-        summary="Waiting for approval to apply changes.",
-        last_event_at=datetime.now(UTC),
+    app = CodingPetWidgetApp(
+        socket_path=config.runtime_dir / "coding-pet.sock",
+        state_store=StateStore(config.state_file),
     )
+    live_mode = app.socket_path is not None and app.socket_path.exists()
+    widget_status = (
+        "coding-pet widget "
+        f"runtime_dir={config.runtime_dir} "
+        f"state_file={config.state_file} "
+        f"live_mode={str(live_mode).lower()}"
+    )
+    typer.echo(widget_status)
     try:
         qt_app = app.ensure_app()
     except Exception:
         typer.echo("PySide6 GUI runtime is unavailable in this environment.")
         return
-    app.show_sessions([demo])
+
+    async def prepare() -> None:
+        await app.load_snapshot()
+        if app.socket_path is not None and app.socket_path.exists():
+            await app.connect_to_daemon()
+            return
+        demo = SessionStatus(
+            session_id="demo",
+            agent_kind=AgentKind.CLAUDE_CODE,
+            title="Demo Session",
+            workspace=str(Path.cwd()),
+            state=AttentionState.NEEDS_PERMISSION,
+            summary="Waiting for approval to apply changes.",
+            last_event_at=datetime.now(UTC),
+        )
+        app.show_sessions([demo])
+
+    asyncio.run(prepare())
     raise typer.Exit(code=qt_app.exec())
 
 

@@ -8,8 +8,10 @@ from typing import Any
 
 from coding_pet.gui.theme import WidgetTheme, default_theme
 from coding_pet.ipc.client import IpcClient
-from coding_pet.models import SessionStatus
+from coding_pet.models import AttentionState, SessionStatus
 from coding_pet.state_store import StateStore
+
+ActionResult = dict[str, object]
 
 
 def layout_sessions(
@@ -36,6 +38,7 @@ class CodingPetWidgetApp:
     socket_path: Path | None = None
     state_store: StateStore | None = None
     widgets: dict[str, Any] = field(default_factory=dict)
+    last_action_result: ActionResult | None = None
     _client: IpcClient | None = field(init=False, default=None)
     _listen_task: asyncio.Task[None] | None = field(init=False, default=None)
     _ready: asyncio.Event = field(init=False, default_factory=asyncio.Event)
@@ -162,3 +165,24 @@ class CodingPetWidgetApp:
             if isinstance(session_id, str) and session_id in self.widgets:
                 self.widgets.pop(session_id)
                 self.show_sessions([widget.status for widget in self.widgets.values()])
+            return
+        if message_type == "action_result":
+            self.last_action_result = message
+            session_id = message.get("session_id")
+            detail = message.get("detail")
+            if (
+                isinstance(session_id, str)
+                and isinstance(detail, str)
+                and session_id in self.widgets
+            ):
+                widget = self.widgets[session_id]
+                updated = widget.status.model_copy(update={
+                    "summary": detail,
+                    "last_output_snippet": detail,
+                    "state": (
+                        AttentionState.RUNNING
+                        if message.get("ok") is True
+                        else widget.status.state
+                    ),
+                })
+                widget.update_status(updated)
