@@ -22,6 +22,7 @@ class SessionPanelRow:
     snippet: str
     unread: bool
     actions: list[PanelAction]
+    read_only: bool
 
 
 class SessionPanelViewModel:
@@ -38,6 +39,7 @@ class SessionPanelViewModel:
                 snippet=status.last_output_snippet or status.summary,
                 unread=status.unread,
                 actions=self.actions_for(status),
+                read_only=not status.live,
             )
             for status in ordered
         ]
@@ -46,6 +48,8 @@ class SessionPanelViewModel:
         return status.model_copy(update={"unread": False})
 
     def actions_for(self, status: SessionStatus) -> list[PanelAction]:
+        if not status.live:
+            return [PanelAction.OPEN_WORKSPACE]
         if status.state.name == "NEEDS_PERMISSION":
             return [PanelAction.APPROVE, PanelAction.REJECT]
         if status.state.name == "NEEDS_INPUT":
@@ -53,6 +57,6 @@ class SessionPanelViewModel:
         return [PanelAction.OPEN_WORKSPACE]
 
     def reply_shortcuts_for(self, status: SessionStatus) -> list[str]:
-        if status.state.name != "NEEDS_INPUT":
+        if not status.live or status.state.name != "NEEDS_INPUT":
             return []
         return list(self.QUICK_REPLY_SHORTCUTS)

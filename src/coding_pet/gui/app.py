@@ -88,7 +88,7 @@ class CodingPetWidgetApp:
     async def load_snapshot(self) -> None:
         if self.state_store is None:
             return
-        sessions = await self.state_store.read_sessions()
+        sessions = await self.state_store.restore_sessions()
         self.show_sessions(sessions)
 
     async def connect_to_daemon(self, *, message_limit: int | None = None) -> None:

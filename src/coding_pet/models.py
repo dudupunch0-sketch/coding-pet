@@ -50,6 +50,7 @@ class SessionStatus(BaseModel):
     last_output_snippet: str = ""
     attention_score: int = Field(default=0)
     unread: bool = False
+    live: bool = True
 
     @field_validator("attention_score", mode="before")
     @classmethod

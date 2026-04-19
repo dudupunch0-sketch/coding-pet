@@ -25,4 +25,5 @@ class StateStore:
         return [SessionStatus.model_validate(item) for item in raw]
 
     async def restore_sessions(self) -> list[SessionStatus]:
-        return await self.read_sessions()
+        sessions = await self.read_sessions()
+        return [session.model_copy(update={"live": False}) for session in sessions]

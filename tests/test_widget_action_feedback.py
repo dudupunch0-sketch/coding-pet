@@ -26,6 +26,27 @@ def build_status(session_id: str, state: AttentionState) -> SessionStatus:
 
 
 @pytest.mark.asyncio
+async def test_widget_marks_restored_snapshot_sessions_read_only(tmp_path: Path) -> None:
+    registry = SessionRegistry()
+    restored = build_status("alpha", AttentionState.NEEDS_INPUT).model_copy(update={"live": False})
+    await registry.upsert(restored)
+    server = IpcServer(socket_path=tmp_path / "coding-pet.sock", registry=registry)
+    await server.start()
+
+    try:
+        app = CodingPetWidgetApp(socket_path=server.socket_path)
+        await app.connect_to_daemon(message_limit=1)
+
+        widget = app.widgets["alpha"]
+        assert widget.status.live is False
+        assert widget.available_panel_actions() == ["open_workspace"]
+        assert widget.available_reply_shortcuts() == []
+    finally:
+        await app.disconnect_from_daemon()
+        await server.stop()
+
+
+@pytest.mark.asyncio
 async def test_widget_receives_action_result_message(tmp_path: Path) -> None:
     registry = SessionRegistry()
     server = IpcServer(socket_path=tmp_path / "coding-pet.sock", registry=registry)

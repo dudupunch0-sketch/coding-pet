@@ -114,6 +114,19 @@ def test_session_panel_exposes_actions_for_permission_and_input_workflows() -> N
     assert review_actions == [PanelAction.OPEN_WORKSPACE]
 
 
+def test_session_panel_marks_restored_sessions_read_only_and_disables_live_actions() -> None:
+    panel = SessionPanelViewModel()
+    restored = build_status("restored", AttentionState.NEEDS_PERMISSION).model_copy(
+        update={"live": False}
+    )
+
+    rows = panel.rows_for([restored])
+
+    assert rows[0].read_only is True
+    assert panel.actions_for(restored) == [PanelAction.OPEN_WORKSPACE]
+    assert panel.reply_shortcuts_for(restored) == []
+
+
 def test_session_panel_shows_multiple_agent_kinds() -> None:
     panel = SessionPanelViewModel()
     rows = panel.rows_for(

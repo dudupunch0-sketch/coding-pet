@@ -57,6 +57,7 @@ async def test_state_store_restore_returns_historical_sessions(tmp_path: Path) -
         AttentionState.COMPLETED,
         AttentionState.FAILED,
     }
+    assert {status.live for status in restored} == {False}
 
 
 @pytest.mark.asyncio
@@ -74,6 +75,8 @@ async def test_widget_can_boot_from_snapshot_before_live_updates(tmp_path: Path)
 
     assert sorted(app.widgets) == ["snap-a", "snap-b"]
     assert app.widgets["snap-b"].status.state is AttentionState.NEEDS_INPUT
+    assert app.widgets["snap-b"].status.live is False
+    assert app.widgets["snap-b"].available_panel_actions() == ["open_workspace"]
 
 
 @pytest.mark.asyncio
