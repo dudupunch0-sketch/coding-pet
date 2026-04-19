@@ -28,6 +28,7 @@ class CodingPetWidgetShell:
         self.panel = SessionPanelViewModel()
         self.x = 0
         self.y = 0
+        self._feedback_text: str | None = None
         self._widget: Any | None = None
         self._pet_label: Any | None = None
         self._bubble_label: Any | None = None
@@ -37,11 +38,13 @@ class CodingPetWidgetShell:
 
     def presentation(self) -> WidgetPresentation:
         mood = mood_for_status(self.status)
-        bubble_text = bubble_text_for_status(self.status)
+        bubble_text = self._feedback_text or bubble_text_for_status(self.status)
         return WidgetPresentation(mood=mood.value, bubble_text=bubble_text)
 
-    def update_status(self, status: SessionStatus) -> None:
+    def update_status(self, status: SessionStatus, *, clear_feedback: bool = True) -> None:
         self.status = status
+        if clear_feedback:
+            self._feedback_text = None
         presentation = self.presentation()
         if self._pet_label is not None:
             self._pet_label.setText(self._pet_glyph(presentation.mood))
@@ -70,6 +73,11 @@ class CodingPetWidgetShell:
 
     def available_reply_shortcuts(self) -> list[str]:
         return self.panel.reply_shortcuts_for(self.status)
+
+    def apply_action_feedback(self, *, detail: str, ok: bool) -> None:
+        prefix = "Action sent" if ok else "Action failed"
+        self._feedback_text = f"{prefix}: {detail}"
+        self.update_status(self.status, clear_feedback=False)
 
     def build_reply_shortcut_request(self, shortcut: str) -> dict[str, str]:
         return {

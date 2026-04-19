@@ -177,12 +177,14 @@ class CodingPetWidgetApp:
             ):
                 widget = self.widgets[session_id]
                 updated = widget.status.model_copy(update={
-                    "summary": detail,
-                    "last_output_snippet": detail,
                     "state": (
                         AttentionState.RUNNING
                         if message.get("ok") is True
                         else widget.status.state
                     ),
                 })
-                widget.update_status(updated)
+                widget.update_status(updated, clear_feedback=False)
+                widget.apply_action_feedback(
+                    detail=detail,
+                    ok=message.get("ok") is True,
+                )

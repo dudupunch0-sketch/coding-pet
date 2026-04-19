@@ -47,8 +47,11 @@ async def test_widget_marks_restored_snapshot_sessions_read_only(tmp_path: Path)
 
 
 @pytest.mark.asyncio
-async def test_widget_receives_action_result_message(tmp_path: Path) -> None:
+async def test_widget_receives_action_result_message_without_overwriting_session_summary(
+    tmp_path: Path,
+) -> None:
     registry = SessionRegistry()
+    await registry.upsert(build_status("alpha", AttentionState.NEEDS_INPUT))
     server = IpcServer(socket_path=tmp_path / "coding-pet.sock", registry=registry)
     await server.start()
 
@@ -72,6 +75,49 @@ async def test_widget_receives_action_result_message(tmp_path: Path) -> None:
             "detail": "keep going delivered",
             "type": "action_result",
         }
+        widget = app.widgets["alpha"]
+        assert widget.status.summary == "alpha:needs_input"
+        assert widget.presentation().bubble_text == "Action sent: keep going delivered"
+        assert widget.status.state is AttentionState.RUNNING
+    finally:
+        await app.disconnect_from_daemon()
+        await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_widget_clears_action_feedback_when_new_session_output_arrives(
+    tmp_path: Path,
+) -> None:
+    registry = SessionRegistry()
+    await registry.upsert(build_status("alpha", AttentionState.NEEDS_INPUT))
+    server = IpcServer(socket_path=tmp_path / "coding-pet.sock", registry=registry)
+    await server.start()
+
+    try:
+        app = CodingPetWidgetApp(socket_path=server.socket_path)
+        await app.connect_to_daemon(message_limit=1)
+        await app.apply_daemon_message(
+            {
+                "type": "action_result",
+                "session_id": "alpha",
+                "action": "send_reply",
+                "ok": False,
+                "detail": "session is not live",
+            }
+        )
+        assert app.widgets["alpha"].presentation().bubble_text == (
+            "Action failed: session is not live"
+        )
+
+        updated = build_status("alpha", AttentionState.NEEDS_INPUT).model_copy(
+            update={"summary": "Waiting for the next reply."}
+        )
+        await app.apply_daemon_message(
+            {"type": "session_updated", "session": updated.model_dump(mode="json")}
+        )
+
+        assert app.widgets["alpha"].presentation().bubble_text == "Waiting for the next reply."
+        assert app.widgets["alpha"].status.summary == "Waiting for the next reply."
     finally:
         await app.disconnect_from_daemon()
         await server.stop()
