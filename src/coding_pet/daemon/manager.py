@@ -14,7 +14,7 @@ from coding_pet.notifiers.base import Notification, Notifier
 from coding_pet.notifiers.desktop import DesktopNotifier
 from coding_pet.state_store import StateStore
 
-ReplyHandler = Callable[[str], Awaitable[None]]
+ActionHandler = Callable[[SessionActionRequest], Awaitable[None]]
 
 
 class MonitorManager:
@@ -33,7 +33,7 @@ class MonitorManager:
         self.notification_cooldown = notification_cooldown
         self.state_store = state_store
         self._tasks: dict[str, asyncio.Task[None]] = {}
-        self._reply_handlers: dict[str, ReplyHandler] = {}
+        self._action_handlers: dict[str, ActionHandler] = {}
         self._last_seen_states: dict[str, AttentionState] = {}
         self._last_notified_at: dict[tuple[str, AttentionState], datetime] = {}
         self._completed_notified: set[str] = set()
@@ -51,7 +51,7 @@ class MonitorManager:
         process: ProcessHandle,
         title: str | None = None,
         pid: int | None = None,
-        reply_handler: ReplyHandler | None = None,
+        action_handler: ActionHandler | None = None,
     ) -> None:
         await self.stop_session(session_id)
         monitor = MonitorTask(
@@ -66,11 +66,11 @@ class MonitorManager:
             pid=pid,
         )
         self._tasks[session_id] = asyncio.create_task(monitor.run())
-        if reply_handler is not None:
-            self._reply_handlers[session_id] = reply_handler
+        if action_handler is not None:
+            self._action_handlers[session_id] = action_handler
 
     async def stop_session(self, session_id: str) -> None:
-        self._reply_handlers.pop(session_id, None)
+        self._action_handlers.pop(session_id, None)
         task = self._tasks.pop(session_id, None)
         if task is None:
             return
@@ -94,40 +94,32 @@ class MonitorManager:
         return task is not None and not task.done()
 
     async def route_action(self, request: SessionActionRequest) -> ActionResult:
-        if request.action == "send_reply":
-            handler = self._reply_handlers.get(request.session_id)
-            if handler is None:
-                self._logger.warning(
-                    "Session reply requested without live control channel",
-                    extra={"session_id": request.session_id},
-                )
-                return {
-                    "type": "action_result",
-                    "session_id": request.session_id,
-                    "action": request.action,
-                    "ok": False,
-                    "detail": "session has no live reply channel",
-                }
-            assert request.reply_text is not None
-            await handler(request.reply_text)
+        handler = self._action_handlers.get(request.session_id)
+        if handler is None:
+            self._logger.warning(
+                "Session action requested without live control channel",
+                extra={"session_id": request.session_id, "action": request.action},
+            )
             return {
                 "type": "action_result",
                 "session_id": request.session_id,
                 "action": request.action,
-                "ok": True,
-                "detail": f"{request.reply_text} delivered",
+                "ok": False,
+                "detail": "session has no live control channel",
             }
 
-        self._logger.warning(
-            "Session action is not yet supported by live control channel",
-            extra={"session_id": request.session_id, "action": request.action},
+        await handler(request)
+        detail = (
+            f"{request.reply_text} delivered"
+            if request.action == "send_reply" and request.reply_text is not None
+            else f"{request.action} delivered"
         )
         return {
             "type": "action_result",
             "session_id": request.session_id,
             "action": request.action,
-            "ok": False,
-            "detail": f"{request.action} is not implemented yet",
+            "ok": True,
+            "detail": detail,
         }
 
     async def restore_from_store(self) -> list[SessionStatus]:

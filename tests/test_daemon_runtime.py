@@ -90,7 +90,7 @@ async def test_session_action_router_rejects_inactive_sessions(
             "session_id": request.session_id,
             "action": request.action,
             "ok": True,
-            "detail": "should not route",
+            "detail": "unexpected",
         }
 
     router = SessionActionRouter(
@@ -100,7 +100,7 @@ async def test_session_action_router_rejects_inactive_sessions(
     )
 
     with caplog.at_level(logging.WARNING):
-        await router.handle_message(
+        result = await router.handle_message(
             {
                 "type": "action_request",
                 "session_id": "restored-1",
@@ -110,6 +110,8 @@ async def test_session_action_router_rejects_inactive_sessions(
         )
 
     assert routed == []
+    assert result["ok"] is False
+    assert result["detail"] == "session is not live"
     assert "inactive session" in caplog.text.lower()
 
 
@@ -184,8 +186,9 @@ async def test_daemon_runtime_routes_reply_into_live_session_handler(tmp_path: P
     delivered: list[str] = []
     delivered_event = asyncio.Event()
 
-    async def reply_handler(reply_text: str) -> None:
-        delivered.append(reply_text)
+    async def action_handler(request: SessionActionRequest) -> None:
+        assert request.reply_text is not None
+        delivered.append(request.reply_text)
         delivered_event.set()
 
     await runtime.start()
@@ -197,7 +200,7 @@ async def test_daemon_runtime_routes_reply_into_live_session_handler(tmp_path: P
         title="live-2",
         output_lines=delayed_lines((1.0, "waiting")),
         process=FakeProcess(),
-        reply_handler=reply_handler,
+        action_handler=action_handler,
     )
     client = IpcClient(runtime.socket_path)
 
@@ -218,3 +221,103 @@ async def test_daemon_runtime_routes_reply_into_live_session_handler(tmp_path: P
         await runtime.stop()
 
     assert delivered == ["summarize shortly"]
+
+
+@pytest.mark.asyncio
+async def test_daemon_runtime_routes_approve_into_live_session_handler(tmp_path: Path) -> None:
+    registry = SessionRegistry()
+    state_store = StateStore(tmp_path / "state.json")
+    runtime = DaemonRuntime(
+        runtime_dir=tmp_path / ("deep-runtime-segment-" * 12),
+        state_store=state_store,
+        registry=registry,
+    )
+    received: list[str] = []
+    received_event = asyncio.Event()
+
+    async def action_handler(request: SessionActionRequest) -> None:
+        received.append(request.action)
+        received_event.set()
+
+    await runtime.start()
+    assert runtime.manager is not None
+    await runtime.manager.start_session(
+        session_id="live-approve",
+        adapter=ClaudeCodeAdapter(),
+        workspace="/tmp/live-approve",
+        title="live-approve",
+        output_lines=delayed_lines((1.0, "waiting")),
+        process=FakeProcess(),
+        action_handler=action_handler,
+    )
+    client = IpcClient(runtime.socket_path)
+
+    try:
+        await client.connect()
+        await client.read_message()
+        await client.send(
+            {
+                "type": "action_request",
+                "session_id": "live-approve",
+                "action": "approve",
+            }
+        )
+        result = await client.read_message()
+        await asyncio.wait_for(received_event.wait(), timeout=1)
+    finally:
+        await client.close()
+        await runtime.stop()
+
+    assert received == ["approve"]
+    assert result["ok"] is True
+    assert result["detail"] == "approve delivered"
+
+
+@pytest.mark.asyncio
+async def test_daemon_runtime_routes_reject_into_live_session_handler(tmp_path: Path) -> None:
+    registry = SessionRegistry()
+    state_store = StateStore(tmp_path / "state.json")
+    runtime = DaemonRuntime(
+        runtime_dir=tmp_path / ("deep-runtime-segment-" * 12),
+        state_store=state_store,
+        registry=registry,
+    )
+    received: list[str] = []
+    received_event = asyncio.Event()
+
+    async def action_handler(request: SessionActionRequest) -> None:
+        received.append(request.action)
+        received_event.set()
+
+    await runtime.start()
+    assert runtime.manager is not None
+    await runtime.manager.start_session(
+        session_id="live-reject",
+        adapter=ClaudeCodeAdapter(),
+        workspace="/tmp/live-reject",
+        title="live-reject",
+        output_lines=delayed_lines((1.0, "waiting")),
+        process=FakeProcess(),
+        action_handler=action_handler,
+    )
+    client = IpcClient(runtime.socket_path)
+
+    try:
+        await client.connect()
+        await client.read_message()
+        await client.send(
+            {
+                "type": "action_request",
+                "session_id": "live-reject",
+                "action": "reject",
+            }
+        )
+        result = await client.read_message()
+        await asyncio.wait_for(received_event.wait(), timeout=1)
+    finally:
+        await client.close()
+        await runtime.stop()
+
+    assert received == ["reject"]
+    assert result["ok"] is True
+    assert result["detail"] == "reject delivered"

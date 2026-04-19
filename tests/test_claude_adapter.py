@@ -49,3 +49,11 @@ def test_claude_adapter_exposes_launch_metadata() -> None:
         "code",
         "Fix lint",
     ]
+
+
+def test_claude_adapter_control_messages_cover_reply_and_approval_actions() -> None:
+    adapter = ClaudeCodeAdapter()
+
+    assert adapter.control_message(action="send_reply", reply_text="keep going") == "keep going"
+    assert adapter.control_message(action="approve") == "approve"
+    assert adapter.control_message(action="reject") == "reject"

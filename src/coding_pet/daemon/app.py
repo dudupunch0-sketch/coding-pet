@@ -10,6 +10,7 @@ from typing import Protocol
 from coding_pet.agents.base import AgentAdapter
 from coding_pet.agents.claude_code import ClaudeCodeAdapter
 from coding_pet.agents.opencode import OpenCodeAdapter
+from coding_pet.daemon.action_router import SessionActionRequest
 from coding_pet.daemon.manager import MonitorManager
 from coding_pet.daemon.session_registry import SessionRegistry
 from coding_pet.models import AgentKind
@@ -29,8 +30,8 @@ async def _readlines(stream: asyncio.StreamReader) -> AsyncIterator[str]:
         yield line.decode(errors="replace").rstrip("\n")
 
 
-async def _send_process_reply(stdin: StdinWriter, reply_text: str) -> None:
-    stdin.write((reply_text + "\n").encode())
+async def _send_process_message(stdin: StdinWriter, message: str) -> None:
+    stdin.write((message + "\n").encode())
     await stdin.drain()
 
 
@@ -56,6 +57,7 @@ class DaemonApp:
         session_id: str,
         title: str | None = None,
     ) -> None:
+        adapter = self.adapter_for(agent_kind)
         process = await asyncio.create_subprocess_exec(
             *shell_split(command),
             cwd=workspace,
@@ -65,20 +67,26 @@ class DaemonApp:
         )
         assert process.stdout is not None
         stdin = process.stdin
-        send_reply: Callable[[str], Awaitable[None]] | None = None
+        send_action: Callable[[SessionActionRequest], Awaitable[None]] | None = None
         if stdin is not None:
-            async def send_reply(reply_text: str) -> None:
-                await _send_process_reply(stdin, reply_text)
+            async def send_action(request: SessionActionRequest) -> None:
+                message = adapter.control_message(
+                    action=request.action,
+                    reply_text=request.reply_text,
+                )
+                if message is None:
+                    return
+                await _send_process_message(stdin, message)
         else:
-            send_reply = None
+            send_action = None
         await self.manager.start_session(
             session_id=session_id,
-            adapter=self.adapter_for(agent_kind),
+            adapter=adapter,
             workspace=str(Path(workspace)),
             title=title,
             output_lines=_readlines(process.stdout),
             process=process,
             pid=process.pid,
-            reply_handler=send_reply,
+            action_handler=send_action,
         )
         await self.manager.wait_for_all()

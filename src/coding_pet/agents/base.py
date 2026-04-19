@@ -3,10 +3,14 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from coding_pet.daemon.classifier import ClassifierInput, OutputClassifier
 from coding_pet.events import SessionEvent
 from coding_pet.models import AgentKind, AttentionState, SessionStatus
+
+if TYPE_CHECKING:
+    from coding_pet.daemon.action_router import SupportedAction
 
 
 class AgentAdapter(ABC):
@@ -49,6 +53,20 @@ class AgentAdapter(ABC):
 
     def extract_summary(self, line: str) -> str:
         return line.strip()
+
+    def control_message(
+        self,
+        *,
+        action: SupportedAction,
+        reply_text: str | None = None,
+    ) -> str | None:
+        if action == "send_reply":
+            return reply_text
+        if action == "approve":
+            return "approve"
+        if action == "reject":
+            return "reject"
+        return None
 
     @abstractmethod
     def launch_command(self, *, prompt: str, workspace: str) -> list[str]:

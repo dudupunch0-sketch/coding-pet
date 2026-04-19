@@ -49,3 +49,13 @@ def test_opencode_adapter_exposes_launch_metadata() -> None:
         "run",
         "Review tests",
     ]
+
+
+def test_opencode_adapter_control_messages_cover_reply_and_approval_actions() -> None:
+    adapter = OpenCodeAdapter()
+
+    assert adapter.control_message(action="send_reply", reply_text="summarize shortly") == (
+        "summarize shortly"
+    )
+    assert adapter.control_message(action="approve") == "approve"
+    assert adapter.control_message(action="reject") == "reject"
