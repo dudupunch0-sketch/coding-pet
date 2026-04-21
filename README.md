@@ -16,6 +16,7 @@ Implemented today:
 - typed session and event models
 - concurrent daemon monitor manager
 - Claude Code and OpenCode adapters
+- registry-backed optional backend detection with fail-fast degraded behavior when local agent binaries are unavailable
 - structured logging and XDG-aware configuration
 - daemon/widget IPC over Unix domain sockets
 - desktop notification backend with cooldowns
@@ -25,6 +26,7 @@ Implemented today:
 - theme manifest and asset validation pipeline
 - `daemon run`, `widget run`, and `admin doctor` CLI runtime commands
 - daemon-owned live action routing for `send_reply`, `approve`, and `reject`
+- normalized action failure reasons for unavailable, unsupported, missing, read-only, and no-live-control-channel paths
 - explicit widget action feedback plus read-only restored-session handling
 
 Still in progress:
@@ -102,6 +104,38 @@ Run the daemon runtime bootstrap:
 PYTHONPATH=src python scripts/run_daemon.py
 ```
 
+## Constrained-server smoke checks
+
+These checks are valid on the current server even though Claude Code and OpenCode are not installed.
+
+Doctor:
+```bash
+PYTHONPATH=src python -m coding_pet.cli admin doctor
+```
+Expected current-server signals include:
+- `backend_claude_code=unavailable:not installed (missing 'claude')`
+- `backend_opencode=unavailable:not installed (missing 'opencode')`
+- `gui_runtime=unavailable` in headless/minimal environments
+
+Daemon startup smoke check:
+```bash
+CODING_PET_DAEMON_ONESHOT=1 PYTHONPATH=src python -m coding_pet.cli daemon run
+```
+Expected:
+- prints `coding-pet daemon ready ...`
+- exits cleanly without requiring any local agent backend
+
+Widget startup smoke check:
+```bash
+PYTHONPATH=src python -m coding_pet.cli widget run
+```
+Expected on this server:
+- prints widget runtime/state information
+- reports `live_mode=false` when no daemon socket exists
+- prints `PySide6 GUI runtime is unavailable in this environment.` when the host lacks Qt runtime support
+
+Monitor commands for Claude Code or OpenCode still appear in the CLI, but on this server they are expected to fail fast with an unavailable-backend diagnostic instead of attempting launch.
+
 Monitor a session from source checkout:
 ```bash
 PYTHONPATH=src python -m coding_pet.cli daemon monitor \
@@ -146,4 +180,5 @@ Useful overrides:
 - `python -m coding_pet.cli daemon run` and `widget run` now exist, but the current host still lacks a real PySide6/Qt runtime for manual GUI exercise
 - live panel actions are routed through adapter-defined stdin control messages; per-agent approval/rejection semantics still need validation against real Claude Code/OpenCode sessions
 - restored snapshot sessions are intentionally read-only until a live daemon snapshot replaces them
+- `daemon monitor` for Claude Code and OpenCode is intentionally fail-fast on this server because those backends are not installed locally
 - the GUI shell falls back gracefully when PySide6 runtime libraries are unavailable

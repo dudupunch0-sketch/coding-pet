@@ -11,12 +11,14 @@ Files:
 - `src/coding_pet/agents/base.py`
 - `src/coding_pet/agents/claude_code.py`
 - `src/coding_pet/agents/opencode.py`
+- `src/coding_pet/agents/registry.py`
 
 Responsibilities:
 - normalize per-agent launch metadata
 - build initial `SessionStatus`
 - classify output lines through the shared classifier
 - provide agent-specific launch commands
+- report whether local backend binaries are available so daemon/CLI flows can degrade cleanly
 
 ### 2. Daemon core
 Files:
@@ -35,6 +37,7 @@ Responsibilities:
 - persist snapshots to disk for restart recovery
 - validate and route widget action requests through a daemon-owned control path
 - distinguish live sessions from restored snapshot-only sessions
+- resolve adapters through the backend registry instead of hardcoded daemon selection
 
 ### 3. Models and events
 Files:
@@ -69,6 +72,7 @@ Behavior:
 - a new widget receives a full snapshot first
 - later updates stream incrementally
 - widget action requests are sent back over the same socket and acknowledged with `action_result`
+- `action_result` now carries a stable `reason` string for degraded failures such as unavailable backends, inactive sessions, or missing live control
 - reconnecting widgets can rebuild state without restarting the daemon
 
 ### 5. Widget layer
@@ -146,4 +150,5 @@ Default path:
 
 - actual agent-native approval/rejection semantics are still stdin-string based placeholders rather than proven per-agent protocols
 - the PySide6 environment on this host is still unavailable for real manual GUI runs, so some UX work remains test-driven only
+- this server still uses constrained degraded-mode operation for Claude Code/OpenCode because those binaries are not installed locally
 - sprite/theme assets are still placeholder quality
