@@ -9,6 +9,7 @@ from pathlib import Path
 
 import typer
 
+from coding_pet.agents.registry import AgentBackendRegistry
 from coding_pet.config import load_config
 from coding_pet.daemon.app import DaemonApp
 from coding_pet.daemon.runtime import DaemonRuntime
@@ -69,6 +70,10 @@ def daemon_monitor(
     session_id: str | None = SESSION_ID_OPTION,
 ) -> None:
     """Launch and monitor a single agent command."""
+    backend = AgentBackendRegistry.default().describe(agent)
+    if not backend.available:
+        typer.echo(f"backend {agent.value} is unavailable: {backend.reason}")
+        raise typer.Exit(code=1)
     resolved_session_id = session_id or f"{agent.value}-{uuid.uuid4().hex[:8]}"
     app_instance = DaemonApp()
     asyncio.run(
@@ -140,6 +145,10 @@ def admin_doctor() -> None:
     typer.echo(f"log_level={config.log_level}")
     typer.echo(f"python={shutil.which('python') or shutil.which('python3') or 'unavailable'}")
     typer.echo(f"notify_send={shutil.which('notify-send') or 'unavailable'}")
+    registry = AgentBackendRegistry.default()
+    for backend in registry.list_all():
+        status = "available" if backend.available else "unavailable"
+        typer.echo(f"backend_{backend.agent_kind.value}={status}:{backend.reason}")
 
 
 def main() -> None:

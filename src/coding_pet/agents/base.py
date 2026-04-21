@@ -21,6 +21,10 @@ class AgentAdapter(ABC):
     def agent_kind(self) -> AgentKind:
         raise NotImplementedError
 
+    @abstractmethod
+    def binary_name(self) -> str:
+        raise NotImplementedError
+
     def build_initial_status(
         self,
         *,

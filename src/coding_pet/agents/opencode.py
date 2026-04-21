@@ -8,5 +8,8 @@ class OpenCodeAdapter(AgentAdapter):
     def agent_kind(self) -> AgentKind:
         return AgentKind.OPENCODE
 
+    def binary_name(self) -> str:
+        return "opencode"
+
     def launch_command(self, *, prompt: str, workspace: str) -> list[str]:
         return ["opencode", "run", prompt]
