@@ -89,6 +89,32 @@ def test_daemon_monitor_fails_fast_when_backend_is_unavailable(
     assert "backend claude_code is unavailable" in result.stdout.lower()
 
 
+def test_admin_doctor_reports_path_and_runtime_health(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("CODING_PET_LOG_LEVEL", "debug")
+    monkeypatch.setattr(
+        "coding_pet.agents.registry.shutil.which",
+        lambda name: None if name in {"claude", "opencode", "notify-send"} else "/usr/bin/fake",
+    )
+    monkeypatch.setattr("coding_pet.cli.os.access", lambda path, mode: path != tmp_path / "blocked")
+
+    runtime_dir = tmp_path / ".local/state" / "coding-pet" / "runtime"
+    runtime_dir.mkdir(parents=True)
+    (runtime_dir / "coding-pet.sock").write_text("placeholder", encoding="utf-8")
+
+    result = runner.invoke(app, ["admin", "doctor"])
+
+    assert result.exit_code == 0
+    assert "runtime_socket_exists=true" in result.stdout
+    assert "notify_send=unavailable" in result.stdout
+    assert "path_status_config_dir=missing,writable_parent=true" in result.stdout
+    assert "path_status_runtime_dir=exists,writable_parent=true" in result.stdout
+    assert "gui_runtime=unavailable" in result.stdout.lower()
+
+
 def test_admin_doctor_prints_live_configuration(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

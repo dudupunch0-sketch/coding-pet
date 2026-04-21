@@ -133,6 +133,24 @@ def widget_run() -> None:
     raise typer.Exit(code=qt_app.exec())
 
 
+def _path_health(path: Path) -> str:
+    exists = path.exists()
+    parent = path if path.is_dir() else path.parent
+    if parent.exists():
+        writable_parent = os.access(parent, os.W_OK)
+    else:
+        writable_parent = os.access(parent.parent, os.W_OK)
+    return f"{'exists' if exists else 'missing'},writable_parent={str(writable_parent).lower()}"
+
+
+def _gui_runtime_status() -> str:
+    try:
+        from PySide6.QtWidgets import QApplication  # noqa: F401
+    except Exception:
+        return "unavailable"
+    return "available"
+
+
 @admin_app.command("doctor")
 def admin_doctor() -> None:
     """Run basic environment diagnostics."""
@@ -145,6 +163,14 @@ def admin_doctor() -> None:
     typer.echo(f"log_level={config.log_level}")
     typer.echo(f"python={shutil.which('python') or shutil.which('python3') or 'unavailable'}")
     typer.echo(f"notify_send={shutil.which('notify-send') or 'unavailable'}")
+    typer.echo(f"gui_runtime={_gui_runtime_status()}")
+    runtime_socket = config.runtime_dir / "coding-pet.sock"
+    typer.echo(f"runtime_socket_exists={str(runtime_socket.exists()).lower()}")
+    typer.echo(f"path_status_config_dir={_path_health(config.config_dir)}")
+    typer.echo(f"path_status_state_dir={_path_health(config.state_dir)}")
+    typer.echo(f"path_status_runtime_dir={_path_health(config.runtime_dir)}")
+    typer.echo(f"path_status_log_dir={_path_health(config.log_dir)}")
+    typer.echo(f"path_status_state_file={_path_health(config.state_file)}")
     registry = AgentBackendRegistry.default()
     for backend in registry.list_all():
         status = "available" if backend.available else "unavailable"
