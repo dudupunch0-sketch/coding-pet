@@ -8,8 +8,7 @@ from shlex import split as shell_split
 from typing import Protocol
 
 from coding_pet.agents.base import AgentAdapter
-from coding_pet.agents.claude_code import ClaudeCodeAdapter
-from coding_pet.agents.opencode import OpenCodeAdapter
+from coding_pet.agents.registry import AgentBackendRegistry
 from coding_pet.daemon.action_router import SessionActionRequest
 from coding_pet.daemon.manager import MonitorManager
 from coding_pet.daemon.session_registry import SessionRegistry
@@ -38,15 +37,19 @@ async def _send_process_message(stdin: StdinWriter, message: str) -> None:
 @dataclass(slots=True)
 class DaemonApp:
     registry: SessionRegistry = field(default_factory=SessionRegistry)
+    backend_registry: AgentBackendRegistry = field(default_factory=AgentBackendRegistry.default)
     manager: MonitorManager = field(init=False)
 
     def __post_init__(self) -> None:
         self.manager = MonitorManager(registry=self.registry)
 
     def adapter_for(self, agent_kind: AgentKind) -> AgentAdapter:
-        if agent_kind is AgentKind.CLAUDE_CODE:
-            return ClaudeCodeAdapter()
-        return OpenCodeAdapter()
+        backend = self.backend_registry.describe(agent_kind)
+        if not backend.available:
+            raise RuntimeError(
+                f"backend {agent_kind.value} is unavailable: {backend.reason}"
+            )
+        return backend.adapter
 
     async def monitor_command(
         self,

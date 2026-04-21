@@ -10,7 +10,9 @@ from pathlib import Path
 import pytest
 
 from coding_pet.agents.claude_code import ClaudeCodeAdapter
+from coding_pet.agents.registry import AgentBackendRegistry, AgentBackendStatus
 from coding_pet.daemon.action_router import ActionResult, SessionActionRequest, SessionActionRouter
+from coding_pet.daemon.app import DaemonApp
 from coding_pet.daemon.runtime import (
     MAX_SOCKET_PATH_BYTES,
     DaemonRuntime,
@@ -73,6 +75,41 @@ def test_session_action_request_requires_reply_text_for_send_reply() -> None:
                 "action": "send_reply",
             }
         )
+
+
+def test_daemon_app_uses_registry_backed_adapter_lookup() -> None:
+    backend = AgentBackendStatus(
+        agent_kind=AgentKind.CLAUDE_CODE,
+        adapter=ClaudeCodeAdapter(),
+        binary_name="claude",
+        available=True,
+        reason="available",
+        binary_path="/usr/bin/claude",
+    )
+    app = DaemonApp(
+        backend_registry=AgentBackendRegistry({AgentKind.CLAUDE_CODE: backend})
+    )
+
+    adapter = app.adapter_for(AgentKind.CLAUDE_CODE)
+
+    assert adapter is backend.adapter
+
+
+def test_daemon_app_rejects_unavailable_registry_backend() -> None:
+    backend = AgentBackendStatus(
+        agent_kind=AgentKind.CLAUDE_CODE,
+        adapter=ClaudeCodeAdapter(),
+        binary_name="claude",
+        available=False,
+        reason="not installed (missing 'claude')",
+        binary_path=None,
+    )
+    app = DaemonApp(
+        backend_registry=AgentBackendRegistry({AgentKind.CLAUDE_CODE: backend})
+    )
+
+    with pytest.raises(RuntimeError, match="claude_code"):
+        app.adapter_for(AgentKind.CLAUDE_CODE)
 
 
 @pytest.mark.asyncio
