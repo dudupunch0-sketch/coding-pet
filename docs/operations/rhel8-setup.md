@@ -75,7 +75,39 @@ Daemon runtime bootstrap:
 PYTHONPATH=src python scripts/run_daemon.py
 ```
 
+## Current-server smoke checks
+
+These checks were verified on the current constrained server where Claude Code and OpenCode are not installed.
+
+Doctor:
+```bash
+PYTHONPATH=src python -m coding_pet.cli admin doctor
+```
+Expected current-server signals include:
+- `backend_claude_code=unavailable:not installed (missing 'claude')`
+- `backend_opencode=unavailable:not installed (missing 'opencode')`
+- `gui_runtime=unavailable` in headless/minimal environments
+
+Daemon startup smoke check:
+```bash
+CODING_PET_DAEMON_ONESHOT=1 PYTHONPATH=src python -m coding_pet.cli daemon run
+```
+Expected:
+- prints `coding-pet daemon ready ...`
+- exits cleanly without requiring agent backends
+
+Widget startup smoke check:
+```bash
+PYTHONPATH=src python -m coding_pet.cli widget run
+```
+Expected on this server:
+- prints widget runtime/state information
+- reports `live_mode=false` when no daemon socket exists
+- prints `PySide6 GUI runtime is unavailable in this environment.` when the host lacks Qt runtime support
+
 ## Monitoring two simultaneous agents
+
+The following examples require a different server that actually has Claude Code and OpenCode installed. They are included here only as reference for a backend-capable environment, not as a smoke check for the current server.
 
 Terminal 1:
 ```bash
@@ -93,7 +125,7 @@ PYTHONPATH=src python -m coding_pet.cli daemon monitor \
   --workspace /repos/b
 ```
 
-This validates the current monitor command path, and the repository also ships a long-running `daemon run` path plus a widget runtime that prefers connecting to the live daemon socket when available.
+On the current constrained server, `daemon monitor` is still useful as a fail-fast diagnostic: it should reject unavailable backends clearly rather than attempting launch.
 
 ## Files and paths
 
