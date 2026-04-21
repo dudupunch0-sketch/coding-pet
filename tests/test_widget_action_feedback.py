@@ -85,6 +85,37 @@ async def test_widget_receives_action_result_message_without_overwriting_session
 
 
 @pytest.mark.asyncio
+async def test_widget_shows_normalized_failure_reason_feedback(tmp_path: Path) -> None:
+    registry = SessionRegistry()
+    await registry.upsert(build_status("alpha", AttentionState.NEEDS_INPUT))
+    server = IpcServer(socket_path=tmp_path / "coding-pet.sock", registry=registry)
+    await server.start()
+
+    try:
+        app = CodingPetWidgetApp(socket_path=server.socket_path)
+        await app.connect_to_daemon(message_limit=1)
+        await app.apply_daemon_message(
+            {
+                "type": "action_result",
+                "session_id": "alpha",
+                "action": "send_reply",
+                "ok": False,
+                "reason": "session_not_live",
+                "detail": "session is not live",
+            }
+        )
+
+        assert app.last_action_result is not None
+        assert app.last_action_result["reason"] == "session_not_live"
+        assert app.widgets["alpha"].presentation().bubble_text == (
+            "Action failed: session is not live"
+        )
+    finally:
+        await app.disconnect_from_daemon()
+        await server.stop()
+
+
+@pytest.mark.asyncio
 async def test_widget_clears_action_feedback_when_new_session_output_arrives(
     tmp_path: Path,
 ) -> None:

@@ -5,7 +5,11 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
 from coding_pet.agents.base import AgentAdapter
-from coding_pet.daemon.action_router import ActionResult, SessionActionRequest
+from coding_pet.daemon.action_router import (
+    ActionResult,
+    SessionActionRequest,
+    failure_result,
+)
 from coding_pet.daemon.monitor import MonitorTask, ProcessHandle
 from coding_pet.daemon.session_registry import SessionRegistry
 from coding_pet.logging import ContextAdapter, get_logger
@@ -100,13 +104,12 @@ class MonitorManager:
                 "Session action requested without live control channel",
                 extra={"session_id": request.session_id, "action": request.action},
             )
-            return {
-                "type": "action_result",
-                "session_id": request.session_id,
-                "action": request.action,
-                "ok": False,
-                "detail": "session has no live control channel",
-            }
+            return failure_result(
+                session_id=request.session_id,
+                action=request.action,
+                reason="no_live_control_channel",
+                detail="session has no live control channel",
+            )
 
         await handler(request)
         detail = (
@@ -119,6 +122,7 @@ class MonitorManager:
             "session_id": request.session_id,
             "action": request.action,
             "ok": True,
+            "reason": "delivered",
             "detail": detail,
         }
 

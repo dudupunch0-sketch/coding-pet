@@ -77,6 +77,39 @@ def test_session_action_request_requires_reply_text_for_send_reply() -> None:
         )
 
 
+@pytest.mark.asyncio
+async def test_session_action_router_returns_reason_for_unsupported_action() -> None:
+    registry = SessionRegistry()
+
+    async def dispatch_action(_request: SessionActionRequest) -> ActionResult:
+        return {
+            "type": "action_result",
+            "session_id": "unused",
+            "action": "send_reply",
+            "ok": True,
+            "reason": "delivered",
+            "detail": "unexpected",
+        }
+
+    router = SessionActionRouter(
+        registry=registry,
+        is_session_live=lambda _session_id: False,
+        dispatch_action=dispatch_action,
+    )
+
+    result = await router.handle_message(
+        {
+            "type": "action_request",
+            "session_id": "live-1",
+            "action": "archive",
+        }
+    )
+
+    assert result["ok"] is False
+    assert result["reason"] == "unsupported_action"
+    assert "unsupported action" in str(result["detail"])
+
+
 def test_daemon_app_uses_registry_backed_adapter_lookup() -> None:
     backend = AgentBackendStatus(
         agent_kind=AgentKind.CLAUDE_CODE,
@@ -148,6 +181,7 @@ async def test_session_action_router_rejects_inactive_sessions(
 
     assert routed == []
     assert result["ok"] is False
+    assert result["reason"] == "session_not_live"
     assert result["detail"] == "session is not live"
     assert "inactive session" in caplog.text.lower()
 
@@ -307,6 +341,7 @@ async def test_daemon_runtime_routes_approve_into_live_session_handler(tmp_path:
 
     assert received == ["approve"]
     assert result["ok"] is True
+    assert result["reason"] == "delivered"
     assert result["detail"] == "approve delivered"
 
 
@@ -357,4 +392,5 @@ async def test_daemon_runtime_routes_reject_into_live_session_handler(tmp_path: 
 
     assert received == ["reject"]
     assert result["ok"] is True
+    assert result["reason"] == "delivered"
     assert result["detail"] == "reject delivered"
