@@ -13,6 +13,7 @@ from coding_pet.agents.claude_code import ClaudeCodeAdapter
 from coding_pet.agents.registry import AgentBackendRegistry, AgentBackendStatus
 from coding_pet.daemon.action_router import ActionResult, SessionActionRequest, SessionActionRouter
 from coding_pet.daemon.app import DaemonApp
+from coding_pet.daemon.manager import MonitorManager
 from coding_pet.daemon.runtime import (
     MAX_SOCKET_PATH_BYTES,
     DaemonRuntime,
@@ -146,6 +147,47 @@ def test_daemon_app_rejects_unavailable_registry_backend() -> None:
 
 
 @pytest.mark.asyncio
+async def test_session_action_router_rejects_missing_session_with_reason(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    registry = SessionRegistry()
+    routed: list[SessionActionRequest] = []
+
+    async def dispatch_action(request: SessionActionRequest) -> ActionResult:
+        routed.append(request)
+        return {
+            "type": "action_result",
+            "session_id": request.session_id,
+            "action": request.action,
+            "ok": True,
+            "reason": "delivered",
+            "detail": "unexpected",
+        }
+
+    router = SessionActionRouter(
+        registry=registry,
+        is_session_live=lambda session_id: session_id == "live-1",
+        dispatch_action=dispatch_action,
+    )
+
+    with caplog.at_level(logging.WARNING):
+        result = await router.handle_message(
+            {
+                "type": "action_request",
+                "session_id": "ghost-1",
+                "action": "send_reply",
+                "reply_text": "keep going",
+            }
+        )
+
+    assert routed == []
+    assert result["ok"] is False
+    assert result["reason"] == "session_not_found"
+    assert result["detail"] == "session not found"
+    assert "missing session" in caplog.text.lower()
+
+
+@pytest.mark.asyncio
 async def test_session_action_router_rejects_inactive_sessions(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -184,6 +226,23 @@ async def test_session_action_router_rejects_inactive_sessions(
     assert result["reason"] == "session_not_live"
     assert result["detail"] == "session is not live"
     assert "inactive session" in caplog.text.lower()
+
+
+@pytest.mark.asyncio
+async def test_monitor_manager_returns_reason_when_no_live_control_channel() -> None:
+    registry = SessionRegistry()
+    manager = MonitorManager(registry=registry)
+
+    result = await manager.route_action(
+        SessionActionRequest(
+            session_id="restored-1",
+            action="approve",
+        )
+    )
+
+    assert result["ok"] is False
+    assert result["reason"] == "no_live_control_channel"
+    assert result["detail"] == "session has no live control channel"
 
 
 @pytest.mark.asyncio

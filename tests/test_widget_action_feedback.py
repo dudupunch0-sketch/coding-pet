@@ -116,6 +116,37 @@ async def test_widget_shows_normalized_failure_reason_feedback(tmp_path: Path) -
 
 
 @pytest.mark.asyncio
+async def test_widget_shows_normalized_no_live_control_channel_feedback(tmp_path: Path) -> None:
+    registry = SessionRegistry()
+    await registry.upsert(build_status("alpha", AttentionState.NEEDS_PERMISSION))
+    server = IpcServer(socket_path=tmp_path / "coding-pet.sock", registry=registry)
+    await server.start()
+
+    try:
+        app = CodingPetWidgetApp(socket_path=server.socket_path)
+        await app.connect_to_daemon(message_limit=1)
+        await app.apply_daemon_message(
+            {
+                "type": "action_result",
+                "session_id": "alpha",
+                "action": "approve",
+                "ok": False,
+                "reason": "no_live_control_channel",
+                "detail": "session has no live control channel",
+            }
+        )
+
+        assert app.last_action_result is not None
+        assert app.last_action_result["reason"] == "no_live_control_channel"
+        assert app.widgets["alpha"].presentation().bubble_text == (
+            "Action failed: session has no live control channel"
+        )
+    finally:
+        await app.disconnect_from_daemon()
+        await server.stop()
+
+
+@pytest.mark.asyncio
 async def test_widget_clears_action_feedback_when_new_session_output_arrives(
     tmp_path: Path,
 ) -> None:
