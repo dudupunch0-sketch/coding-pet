@@ -1,8 +1,10 @@
-# Current Server Hardening Plan
+# Current Server Hardening Status
+
+Last verified: 2026-05-06
 
 ## Goal
 
-Make `coding-pet` dependable on the current disk-constrained server without requiring local Claude Code or OpenCode installs. Keep this plan limited to the minimum work needed to remove remaining hardcoded backend assumptions, make degraded-mode failures deterministic, and prove the system stays testable with no real backends present.
+Make `coding-pet` dependable on the current disk-constrained server without requiring local Claude Code or OpenCode installs. The current server remains a constrained/degraded-mode environment: the application must be testable, diagnosable, and operable even when no real local agent backends are installed.
 
 ## Constraints
 
@@ -10,62 +12,95 @@ Make `coding-pet` dependable on the current disk-constrained server without requ
 - The current server has no OpenCode installed.
 - The current server does not have enough disk space to add those tools.
 - Current-server work must remain useful and verifiable with zero real agent backends available.
-- Anything that mainly depends on real backend behavior should move to the future server plan.
+- Anything that mainly depends on real backend behavior belongs in `docs/architecture/future-agent-enabled-server-plan.md`.
 
-## Already Done
+## Completion Status
 
-- Daemon runtime and Unix-socket IPC are in place.
-- Widget live mode and `action_result` feedback are implemented.
-- Restored sessions are already treated as read-only until live state replaces them.
-- Reconnect reset behavior is already implemented.
-- Backend availability detection already exists through the backend registry.
-- `admin doctor` already reports backend availability.
-- `daemon monitor` already fails fast when a requested backend is unavailable.
-- Architecture and operations docs were already updated to match the current baseline.
+Current-server hardening is complete for the constrained-server baseline.
 
-## Mandatory Remaining Work
+Completed hardening:
 
-- Remove daemon hardcoded adapter selection and route through the optional backend registry or a tiny capability lookup.
-  `src/coding_pet/daemon/app.py` must stop choosing adapters via `adapter_for()` and instead use the same optional-backend source of truth already used for availability reporting.
-- Normalize the failure contract for unavailable, unsupported, read-only, and dead-session flows.
-  Keep daemon, IPC, and widget handling consistent so these cases return stable reasons instead of ad hoc messages.
-- Strengthen backend-less tests.
-  Add or tighten tests around registry-backed adapter resolution, degraded action handling, and widget behavior so the suite remains trustworthy without Claude Code or OpenCode installed.
+- Backend availability detection exists through `AgentBackendRegistry`.
+- `admin doctor` reports backend availability and degraded-mode environment diagnostics.
+- `daemon monitor` fails fast with a clear unavailable-backend diagnostic when a requested backend binary is missing.
+- `DaemonApp` resolves adapters through the backend registry instead of hardcoded daemon-side selection.
+- Daemon action failures use stable reason strings for degraded paths.
+- Widget action feedback preserves real session summaries and treats restored sessions as read-only.
+- Backend-less tests cover unavailable backends, degraded action handling, restored/read-only sessions, and widget feedback behavior.
+- Docs and smoke checks explicitly describe the constrained-server behavior.
 
-## Recommended Remaining Work
+## Verified Current-Server Checks
 
-- Expand `admin doctor` only if it materially improves operator diagnosis on this server.
-- Add deploy smoke checks and service verification for daemon and widget startup in degraded mode.
-- Polish README and operations docs only enough to reflect the final constrained-server behavior and the split with the future server plan.
+Run from a source checkout with `PYTHONPATH=src`.
 
-## Moved to Future Server Plan
+Automated validation:
 
-- Rich per-session capability negotiation beyond simple availability and support checks.
+```bash
+PYTHONPATH=src python -m pytest -q
+PYTHONPATH=src python -m ruff check src tests scripts
+PYTHONPATH=src python -m mypy src tests
+PYTHONPATH=src python -m compileall -q src
+systemd-analyze verify \
+  packaging/systemd/coding-pet-daemon.service \
+  packaging/systemd/coding-pet-widget.service \
+  packaging/systemd/coding-pet.target
+```
+
+2026-05-06 result:
+
+- `96 passed`
+- `ruff`: all checks passed
+- `mypy`: no issues found in 52 source files
+- `compileall`: passed
+- `systemd-analyze verify`: passed
+
+Runtime smoke checks:
+
+```bash
+PYTHONPATH=src python -m coding_pet.cli admin doctor
+CODING_PET_DAEMON_ONESHOT=1 PYTHONPATH=src python -m coding_pet.cli daemon run
+PYTHONPATH=src python -m coding_pet.cli widget run
+PYTHONPATH=src python -m coding_pet.cli daemon monitor \
+  --agent claude_code \
+  --cmd "claude code 'summarize'" \
+  --workspace /tmp
+```
+
+Expected constrained-server signals:
+
+- `backend_claude_code=unavailable:not installed (missing 'claude')`
+- `backend_opencode=unavailable:not installed (missing 'opencode')`
+- `daemon run` in oneshot mode prints `coding-pet daemon ready ...` and exits cleanly.
+- `widget run` prints runtime/state information and gracefully reports unavailable GUI runtime when Qt cannot start.
+- `daemon monitor` exits non-zero before launch with an unavailable-backend diagnostic.
+
+## Remaining Work on This Server
+
+Only maintenance and packaging polish should remain here:
+
+- Re-run the smoke checks after environment, packaging, or dependency changes.
+- Keep README and operations docs synchronized with actual CLI output.
+- Validate user-service startup on the final target GUI session when systemd user services and desktop session variables are available.
+- Do not add large backend-specific behavior on this server unless a real backend becomes available.
+
+## Deferred to Future Backend-Enabled Server
+
+The following are intentionally out of scope for the current constrained server and should be handled through `docs/architecture/future-agent-enabled-server-plan.md`:
+
+- Rich per-session capability negotiation beyond simple availability/support checks.
 - Backend-native reply, approve, and reject semantics validated against real installed backends.
 - Transcript and process integration expansion beyond the current lightweight runtime path.
-- Internal or company backend support, including endpoint and credential handling.
+- Internal/company backend support, including endpoint and credential handling.
 - Real-backend integration testing, mixed-backend validation, and backend-specific operator workflows.
-
-## Design Direction for Remaining Current-Server Work
-
-- Reuse the existing backend registry. Do not introduce a second registry, plugin system, or large abstraction layer on this server.
-- Replace `DaemonApp.adapter_for()` with a small registry-backed lookup so daemon launch and control paths use the same optional-backend truth source as `daemon monitor` and `admin doctor`.
-- Do not build a rich capability system yet. Current-server hardening only needs enough support lookup to avoid hardcoded selection and to reject unsupported actions cleanly.
-- Prefer a small set of stable reason strings and simple human-readable details. If the current `action_result` shape needs one more field, add a single reason string rather than a larger error schema.
-- Keep widget and daemon contracts simple. The daemon should make the decision; the widget should only reflect success, failure, read-only state, or unsupported state without learning backend-specific policy.
-
-## Verification
-
-- Run targeted tests for registry-backed adapter resolution with no local backends installed.
-- Run daemon and widget action-path tests for unavailable, unsupported, read-only, and dead-session cases.
-- Verify `coding-pet daemon monitor` still fails fast for unavailable backends.
-- Verify `coding-pet admin doctor` remains clear and non-fatal in a backend-less environment.
-- Keep all required verification runnable on the current server without installing Claude Code or OpenCode.
 
 ## Exit Criteria
 
-- The daemon no longer hardcodes adapter selection in `src/coding_pet/daemon/app.py`.
-- Unavailable, unsupported, read-only, and dead-session flows produce deterministic failure reasons through the existing control path.
-- Backend-less tests cover those degraded cases and pass without real backend binaries.
-- The current server is supportable without installing Claude Code or OpenCode.
+The constrained-server track is considered complete when:
+
+- The daemon no longer hardcodes adapter selection.
+- Unavailable, unsupported, read-only, and dead-session flows produce deterministic failure reasons.
+- Backend-less tests cover degraded cases and pass without real backend binaries.
+- Current-server smoke checks pass without installing Claude Code or OpenCode.
 - Remaining backend-rich work is explicitly deferred to the future server plan.
+
+All of these criteria are met as of the verification above.
