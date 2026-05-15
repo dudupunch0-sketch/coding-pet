@@ -145,11 +145,22 @@ async def test_registry_marks_sessions_read_and_removes_them() -> None:
         title="needs attention",
     ).model_copy(update={"unread": True})
 
+    messages: list[dict[str, object]] = []
+
+    async def subscriber(message: dict[str, object]) -> None:
+        messages.append(message)
+
+    registry.subscribe(subscriber)
     await registry.upsert(unread)
-    await registry.mark_read("s1")
+    marked_result = await registry.mark_read("s1")
     marked = await registry.get("s1")
+    assert marked_result is True
     assert marked is not None
     assert marked.unread is False
+    assert messages[-1]["type"] == "session_updated"
+    session_payload = messages[-1]["session"]
+    assert isinstance(session_payload, dict)
+    assert session_payload["unread"] is False
 
     removed = await registry.remove("s1")
     assert removed is True

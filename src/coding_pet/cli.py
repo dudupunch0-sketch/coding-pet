@@ -4,7 +4,8 @@ import asyncio
 import os
 import shutil
 import uuid
-from datetime import UTC, datetime
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import typer
@@ -12,9 +13,16 @@ import typer
 from coding_pet.agents.registry import AgentBackendRegistry
 from coding_pet.config import load_config
 from coding_pet.daemon.app import DaemonApp
+from coding_pet.daemon.manager import MonitorManager
 from coding_pet.daemon.runtime import DaemonRuntime
+from coding_pet.daemon.session_registry import SessionRegistry
+from coding_pet.daemon.tmux_monitor import TmuxMonitorService, session_id_for_pane
 from coding_pet.models import AgentKind
 from coding_pet.state_store import StateStore
+from coding_pet.tmux.client import TmuxClient, TmuxCommandError
+from coding_pet.tmux.discovery import discover_agent_panes
+from coding_pet.tmux.models import MatchedTmuxPane
+from coding_pet.transcripts.store import TranscriptStore
 
 AGENT_OPTION = typer.Option(..., "--agent", case_sensitive=False)
 CMD_OPTION = typer.Option(..., "--cmd")
@@ -34,9 +42,17 @@ app.add_typer(admin_app, name="admin")
 
 async def _serve_daemon_runtime(*, oneshot: bool) -> DaemonRuntime:
     config = load_config()
+    transcript_store = (
+        TranscriptStore(config.transcript.db_path)
+        if config.transcript.enabled and config.transcript.db_path is not None
+        else None
+    )
     runtime = DaemonRuntime(
         runtime_dir=config.runtime_dir,
         state_store=StateStore(config.state_file),
+        tmux_config=config.tmux,
+        transcript_store=transcript_store,
+        state_detection_config=config.state_detection,
     )
     ready_message = (
         "coding-pet daemon ready "
@@ -86,6 +102,87 @@ def daemon_monitor(
         )
     )
     typer.echo(f"Monitored session {resolved_session_id}")
+
+
+@daemon_app.command("discover-tmux")
+def daemon_discover_tmux() -> None:
+    """List tmux panes and show which panes match agent-session rules."""
+    config = load_config()
+    try:
+        panes = TmuxClient().list_panes()
+    except TmuxCommandError as exc:
+        typer.echo(f"tmux discovery failed: {exc}")
+        raise typer.Exit(code=1) from exc
+    discovery = discover_agent_panes(panes, config=config.tmux)
+    for matched in discovery.matched:
+        pane = matched.pane
+        typer.echo(
+            f"{pane.pane_id}  {pane.session_name:<16}  "
+            f"{matched.agent_kind.value:<11}  {pane.current_path:<24}  matched"
+        )
+    for ignored in discovery.ignored:
+        pane = ignored.pane
+        typer.echo(
+            f"{pane.pane_id}  {pane.session_name:<16}  "
+            f"{pane.current_command:<11}  {pane.current_path:<24}  ignored:{ignored.reason}"
+        )
+
+
+async def _monitor_tmux_once(*, pane: str, agent: str, title: str | None) -> str:
+    config = load_config()
+    client = TmuxClient()
+    panes = client.list_panes()
+    selected = next((info for info in panes if info.pane_id == pane), None)
+    if selected is None:
+        raise RuntimeError(f"tmux pane not found: {pane}")
+    selected = replace(selected, title=title or selected.title)
+    if config.transcript.enabled and config.transcript.db_path is not None:
+        store = TranscriptStore(config.transcript.db_path)
+        await store.initialize()
+    else:
+        store = None
+
+    registry = SessionRegistry()
+    manager = MonitorManager(registry=registry)
+    monitor = TmuxMonitorService(
+        registry=registry,
+        manager=manager,
+        client=client,
+        transcript_store=store,
+        config=config.tmux,
+        stalled_after=timedelta(seconds=config.state_detection.stalled_after_sec),
+    )
+    session_id = session_id_for_pane(selected)
+    await monitor._upsert_matched_pane(
+        MatchedTmuxPane(
+            pane=selected,
+            agent_kind=AgentKind(agent),
+            reason="manual",
+        )
+    )
+    status = await registry.get(session_id)
+    if status is None:
+        raise RuntimeError(f"tmux pane was not captured: {pane}")
+    return (
+        f"Captured tmux pane {pane} ({agent}) "
+        f"session_id={status.session_id} state={status.state.value} "
+        f"title={status.title} cwd={status.workspace}"
+    )
+
+
+@daemon_app.command("monitor-tmux")
+def daemon_monitor_tmux(
+    pane: str = typer.Option(..., "--pane"),
+    agent: AgentKind = AGENT_OPTION,
+    title: str | None = TITLE_OPTION,
+) -> None:
+    """Capture and classify a manually selected tmux pane once."""
+    try:
+        result = asyncio.run(_monitor_tmux_once(pane=pane, agent=agent.value, title=title))
+    except Exception as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1) from exc
+    typer.echo(result)
 
 
 @widget_app.command("run")
@@ -145,7 +242,7 @@ def _path_health(path: Path) -> str:
 
 def _gui_runtime_status() -> str:
     try:
-        from PySide6.QtWidgets import QApplication  # noqa: F401
+        from PySide6.QtWidgets import QApplication  # type: ignore[import-not-found]  # noqa: F401
     except Exception:
         return "unavailable"
     return "available"
@@ -163,6 +260,11 @@ def admin_doctor() -> None:
     typer.echo(f"log_level={config.log_level}")
     typer.echo(f"python={shutil.which('python') or shutil.which('python3') or 'unavailable'}")
     typer.echo(f"notify_send={shutil.which('notify-send') or 'unavailable'}")
+    typer.echo(f"tmux_binary={shutil.which('tmux') or 'unavailable'}")
+    typer.echo(f"tmux_enabled={str(config.tmux.enabled).lower()}")
+    typer.echo(f"tmux_capture_lines={config.tmux.capture_lines}")
+    typer.echo(f"transcript_db={config.transcript.db_path}")
+    typer.echo(f"transcript_enabled={str(config.transcript.enabled).lower()}")
     typer.echo(f"gui_runtime={_gui_runtime_status()}")
     runtime_socket = config.runtime_dir / "coding-pet.sock"
     typer.echo(f"runtime_socket_exists={str(runtime_socket.exists()).lower()}")

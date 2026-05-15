@@ -18,7 +18,7 @@ from coding_pet.notifiers.base import Notification, Notifier
 from coding_pet.notifiers.desktop import DesktopNotifier
 from coding_pet.state_store import StateStore
 
-ActionHandler = Callable[[SessionActionRequest], Awaitable[None]]
+ActionHandler = Callable[[SessionActionRequest], Awaitable[ActionResult | None]]
 
 
 class MonitorManager:
@@ -71,10 +71,16 @@ class MonitorManager:
         )
         self._tasks[session_id] = asyncio.create_task(monitor.run())
         if action_handler is not None:
-            self._action_handlers[session_id] = action_handler
+            self.register_control_channel(session_id, action_handler)
+
+    def register_control_channel(self, session_id: str, handler: ActionHandler) -> None:
+        self._action_handlers[session_id] = handler
+
+    def unregister_control_channel(self, session_id: str) -> None:
+        self._action_handlers.pop(session_id, None)
 
     async def stop_session(self, session_id: str) -> None:
-        self._action_handlers.pop(session_id, None)
+        self.unregister_control_channel(session_id)
         task = self._tasks.pop(session_id, None)
         if task is None:
             return
@@ -92,10 +98,12 @@ class MonitorManager:
     async def stop_all_sessions(self) -> None:
         for session_id in list(self._tasks):
             await self.stop_session(session_id)
+        for session_id in list(self._action_handlers):
+            self.unregister_control_channel(session_id)
 
     def has_live_session(self, session_id: str) -> bool:
         task = self._tasks.get(session_id)
-        return task is not None and not task.done()
+        return (task is not None and not task.done()) or session_id in self._action_handlers
 
     async def route_action(self, request: SessionActionRequest) -> ActionResult:
         handler = self._action_handlers.get(request.session_id)
@@ -111,20 +119,15 @@ class MonitorManager:
                 detail="session has no live control channel",
             )
 
-        await handler(request)
-        detail = (
-            f"{request.reply_text} delivered"
-            if request.action == "send_reply" and request.reply_text is not None
-            else f"{request.action} delivered"
+        result = await handler(request)
+        if result is not None:
+            return result
+        return failure_result(
+            session_id=request.session_id,
+            action=request.action,
+            reason="unsupported_action",
+            detail=f"{request.action} is not supported by this session",
         )
-        return {
-            "type": "action_result",
-            "session_id": request.session_id,
-            "action": request.action,
-            "ok": True,
-            "reason": "delivered",
-            "detail": detail,
-        }
 
     async def restore_from_store(self) -> list[SessionStatus]:
         if self.state_store is None:
@@ -154,6 +157,7 @@ class MonitorManager:
             return
         if status.state not in {
             AttentionState.NEEDS_PERMISSION,
+            AttentionState.NEEDS_CHOICE,
             AttentionState.NEEDS_INPUT,
             AttentionState.REVIEW_NEEDED,
             AttentionState.COMPLETED,

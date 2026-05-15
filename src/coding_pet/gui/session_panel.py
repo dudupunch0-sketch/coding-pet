@@ -11,6 +11,10 @@ class PanelAction(StrEnum):
     APPROVE = "approve"
     REJECT = "reject"
     SEND_REPLY = "send_reply"
+    SEND_WITHOUT_ENTER = "send_without_enter"
+    ATTACH = "attach"
+    FULL_LOG = "full_log"
+    MARK_READ = "mark_read"
 
 
 @dataclass(slots=True)
@@ -50,6 +54,11 @@ class SessionPanelViewModel:
     def actions_for(self, status: SessionStatus) -> list[PanelAction]:
         if not status.live:
             return [PanelAction.OPEN_WORKSPACE]
+        if status.source_kind == "tmux" and status.tmux_pane_id:
+            actions = [PanelAction.ATTACH, PanelAction.FULL_LOG, PanelAction.MARK_READ]
+            if status.state.name in {"NEEDS_INPUT", "NEEDS_CHOICE", "NEEDS_PERMISSION"}:
+                return [PanelAction.SEND_REPLY, PanelAction.SEND_WITHOUT_ENTER, *actions]
+            return actions
         if status.state.name == "NEEDS_PERMISSION":
             return [PanelAction.APPROVE, PanelAction.REJECT]
         if status.state.name == "NEEDS_INPUT":
@@ -57,6 +66,6 @@ class SessionPanelViewModel:
         return [PanelAction.OPEN_WORKSPACE]
 
     def reply_shortcuts_for(self, status: SessionStatus) -> list[str]:
-        if not status.live or status.state.name != "NEEDS_INPUT":
+        if not status.live or status.state.name not in {"NEEDS_INPUT", "NEEDS_CHOICE"}:
             return []
         return list(self.QUICK_REPLY_SHORTCUTS)

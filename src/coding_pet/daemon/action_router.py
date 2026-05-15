@@ -6,13 +6,34 @@ from typing import Literal, cast
 
 from coding_pet.daemon.session_registry import SessionRegistry
 from coding_pet.logging import ContextAdapter, get_logger
+from coding_pet.models import AttentionState
 
 ActionResult = dict[str, object]
-SupportedAction = Literal["send_reply", "approve", "reject"]
+SupportedAction = Literal[
+    "send_reply",
+    "send_without_enter",
+    "approve",
+    "reject",
+    "attach",
+    "mark_read",
+    "hide_pet",
+    "manual_state_override",
+]
 DispatchAction = Callable[["SessionActionRequest"], Awaitable[ActionResult]]
 LiveSessionLookup = Callable[[str], bool]
 
-_SUPPORTED_ACTIONS = frozenset({"send_reply", "approve", "reject"})
+_SUPPORTED_ACTIONS = frozenset(
+    {
+        "send_reply",
+        "send_without_enter",
+        "approve",
+        "reject",
+        "attach",
+        "mark_read",
+        "hide_pet",
+        "manual_state_override",
+    }
+)
 
 
 def failure_result(
@@ -37,6 +58,8 @@ class SessionActionRequest:
     session_id: str
     action: SupportedAction
     reply_text: str | None = None
+    press_enter: bool = True
+    state_override: AttentionState | None = None
 
     @classmethod
     def from_message(cls, message: dict[str, object]) -> SessionActionRequest:
@@ -49,19 +72,46 @@ class SessionActionRequest:
             raise ValueError(f"unsupported action: {action!r}")
 
         reply_text = message.get("reply_text")
-        if action == "send_reply":
-            if not isinstance(reply_text, str) or not reply_text.strip():
-                raise ValueError("send_reply requires non-empty reply_text")
+        press_enter_value = message.get("press_enter")
+        press_enter = press_enter_value if isinstance(press_enter_value, bool) else True
+        state_override = cls._parse_state_override(message.get("state_override"))
+
+        if action in {"send_reply", "send_without_enter"}:
+            if not isinstance(reply_text, str):
+                raise ValueError(f"{action} requires reply_text")
             return cls(
                 session_id=session_id.strip(),
                 action=cast(SupportedAction, action),
-                reply_text=reply_text.strip(),
+                reply_text=reply_text,
+                press_enter=(False if action == "send_without_enter" else press_enter),
+            )
+
+        if action == "manual_state_override":
+            if state_override is None:
+                raise ValueError("manual_state_override requires state_override")
+            return cls(
+                session_id=session_id.strip(),
+                action=cast(SupportedAction, action),
+                state_override=state_override,
             )
 
         if reply_text is not None:
             raise ValueError(f"{action} does not accept reply_text")
 
         return cls(session_id=session_id.strip(), action=cast(SupportedAction, action))
+
+    @staticmethod
+    def _parse_state_override(value: object) -> AttentionState | None:
+        if value is None:
+            return None
+        if isinstance(value, AttentionState):
+            return value
+        if isinstance(value, str):
+            try:
+                return AttentionState(value)
+            except ValueError as exc:
+                raise ValueError(f"unsupported state_override: {value!r}") from exc
+        raise ValueError("state_override must be a string")
 
 
 @dataclass(slots=True)

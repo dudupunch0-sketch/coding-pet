@@ -1,0 +1,96 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime
+
+from coding_pet.gui.detail_view_model import build_detail_view_model
+from coding_pet.models import AgentKind, AttentionState, SessionStatus
+from coding_pet.transcripts.model import TranscriptEvent
+
+
+def test_detail_view_model_separates_target_last_input_request_and_transcript() -> None:
+    status = SessionStatus(
+        session_id="tmux-%3",
+        agent_kind=AgentKind.CLAUDE_CODE,
+        title="auth-fix",
+        workspace="/proj/ws/auth",
+        state=AttentionState.NEEDS_INPUT,
+        summary="입력 필요",
+        last_event_at=datetime(2026, 5, 15, 10, 43, tzinfo=UTC),
+        source_kind="tmux",
+        tmux_pane_id="%3",
+        tmux_session_name="claude-auth",
+        tmux_window_pane="0.0",
+        last_dashboard_input="OAuth2 callback 실패 원인을 분석해줘",
+        agent_waiting_message="dev / stage / prod 중 어떤 환경 기준으로 볼까요?",
+    )
+    event = TranscriptEvent(
+        event_id="e1",
+        session_id="tmux-%3",
+        ts=datetime(2026, 5, 15, 10, 43, tzinfo=UTC),
+        direction="out",
+        source="tmux_capture",
+        text="Need clarification",
+    )
+
+    vm = build_detail_view_model(status, [event])
+
+    assert vm.target_label == "Claude Code · claude-auth:%3 · /proj/ws/auth"
+    assert vm.last_input == "OAuth2 callback 실패 원인을 분석해줘"
+    assert vm.agent_request == "dev / stage / prod 중 어떤 환경 기준으로 볼까요?"
+    assert vm.transcript_rows[0].text == "Need clarification"
+
+
+
+def test_detail_popup_shell_builds_raw_send_requests_without_trimming() -> None:
+    from coding_pet.gui.detail_popup import DetailPopupShell
+
+    status = SessionStatus(
+        session_id="tmux-%3",
+        agent_kind=AgentKind.OPENCODE,
+        title="build",
+        workspace="/proj/ws/build",
+        state=AttentionState.NEEDS_INPUT,
+        summary="입력 필요",
+        last_event_at=datetime(2026, 5, 15, 10, 43, tzinfo=UTC),
+        source_kind="tmux",
+        tmux_pane_id="%3",
+        tmux_session_name="opencode-build",
+    )
+    popup = DetailPopupShell(status=status, events=[])
+    raw_text = "  stage 환경\n$HOME ; \\ done  "
+
+    assert popup.build_send_request(raw_text, press_enter=True) == {
+        "type": "action_request",
+        "session_id": "tmux-%3",
+        "action": "send_reply",
+        "reply_text": raw_text,
+        "press_enter": True,
+    }
+    assert popup.build_send_request(raw_text, press_enter=False)["action"] == "send_without_enter"
+    assert popup.build_attach_request() == {
+        "type": "action_request",
+        "session_id": "tmux-%3",
+        "action": "attach",
+    }
+
+
+def test_session_panel_exposes_tmux_console_actions_for_live_tmux_sessions() -> None:
+    from coding_pet.gui.session_panel import PanelAction, SessionPanelViewModel
+
+    status = SessionStatus(
+        session_id="tmux-%3",
+        agent_kind=AgentKind.CLAUDE_CODE,
+        title="auth",
+        workspace="/proj/ws/auth",
+        state=AttentionState.NEEDS_CHOICE,
+        summary="선택 필요",
+        last_event_at=datetime(2026, 5, 15, 10, 43, tzinfo=UTC),
+        source_kind="tmux",
+        tmux_pane_id="%3",
+    )
+
+    actions = SessionPanelViewModel().actions_for(status)
+
+    assert PanelAction.SEND_REPLY in actions
+    assert PanelAction.SEND_WITHOUT_ENTER in actions
+    assert PanelAction.ATTACH in actions

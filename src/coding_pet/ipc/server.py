@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from coding_pet.daemon.session_registry import SessionRegistry
+from coding_pet.transcripts.store import TranscriptStore
 
 SessionCallback = Callable[[dict[str, Any]], Awaitable[None]]
 ActionCallback = Callable[[dict[str, object]], Awaitable[dict[str, object] | None]]
@@ -18,6 +19,7 @@ class IpcServer:
     socket_path: Path
     registry: SessionRegistry
     action_handler: ActionCallback | None = None
+    transcript_store: TranscriptStore | None = None
     _server: asyncio.AbstractServer | None = field(init=False, default=None)
     _writers: set[asyncio.StreamWriter] = field(init=False, default_factory=set)
     _unsubscribe: Callable[[], None] | None = field(init=False, default=None)
@@ -61,12 +63,20 @@ class IpcServer:
                     await self._send(writer, {"type": "ping"})
                 elif message.get("type") == "action_request" and self.action_handler is not None:
                     payload: dict[str, object] = {"type": "action_request"}
-                    for key in ("session_id", "action", "reply_text"):
+                    for key in (
+                        "session_id",
+                        "action",
+                        "reply_text",
+                        "press_enter",
+                        "state_override",
+                    ):
                         if key in message:
                             payload[key] = message[key]
                     result = await self.action_handler(payload)
                     if result is not None:
                         await self._send(writer, result)
+                elif message.get("type") == "transcript_request":
+                    await self._handle_transcript_request(writer, message)
         finally:
             self._writers.discard(writer)
             writer.close()
@@ -74,6 +84,37 @@ class IpcServer:
                 await writer.wait_closed()
             except BrokenPipeError:
                 pass
+
+    async def _handle_transcript_request(
+        self,
+        writer: asyncio.StreamWriter,
+        message: dict[str, Any],
+    ) -> None:
+        session_id = message.get("session_id")
+        limit_value = message.get("limit")
+        limit = limit_value if isinstance(limit_value, int) else 100
+        if not isinstance(session_id, str) or self.transcript_store is None:
+            await self._send(
+                writer,
+                {
+                    "type": "transcript_snapshot",
+                    "session_id": session_id if isinstance(session_id, str) else "",
+                    "events": [],
+                    "ok": False,
+                    "reason": "transcript_unavailable",
+                },
+            )
+            return
+        events = await self.transcript_store.list_recent_events(session_id, limit=limit)
+        await self._send(
+            writer,
+            {
+                "type": "transcript_snapshot",
+                "session_id": session_id,
+                "events": [event.model_dump(mode="json") for event in events],
+                "ok": True,
+            },
+        )
 
     async def _send_snapshot(self, writer: asyncio.StreamWriter) -> None:
         listed = await self.registry.list_sessions()
@@ -89,6 +130,15 @@ class IpcServer:
                 dead.append(writer)
         for writer in dead:
             self._writers.discard(writer)
+
+    async def broadcast_transcript_event(self, event: dict[str, Any]) -> None:
+        await self.broadcast(
+            {
+                "type": "transcript_appended",
+                "session_id": event.get("session_id", ""),
+                "event": event,
+            }
+        )
 
     async def _send(self, writer: asyncio.StreamWriter, message: dict[str, Any]) -> None:
         writer.write((json.dumps(message) + "\n").encode())

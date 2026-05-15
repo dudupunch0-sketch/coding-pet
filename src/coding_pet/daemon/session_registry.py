@@ -39,11 +39,19 @@ class SessionRegistry:
         async with self._lock:
             return sorted(self._sessions)
 
-    async def mark_read(self, session_id: str) -> None:
+    async def mark_read(self, session_id: str) -> bool:
         async with self._lock:
             status = self._sessions.get(session_id)
-            if status is not None:
-                self._sessions[session_id] = status.model_copy(update={"unread": False})
+            if status is None:
+                return False
+            updated = status.model_copy(update={"unread": False})
+            self._sessions[session_id] = updated
+            subscribers = list(self._subscribers)
+        await self._notify(
+            subscribers,
+            {"type": "session_updated", "session": updated.model_dump(mode="json")},
+        )
+        return True
 
     async def remove(self, session_id: str) -> bool:
         async with self._lock:

@@ -9,7 +9,7 @@ from typing import Protocol
 
 from coding_pet.agents.base import AgentAdapter
 from coding_pet.agents.registry import AgentBackendRegistry
-from coding_pet.daemon.action_router import SessionActionRequest
+from coding_pet.daemon.action_router import ActionResult, SessionActionRequest, failure_result
 from coding_pet.daemon.manager import MonitorManager
 from coding_pet.daemon.session_registry import SessionRegistry
 from coding_pet.models import AgentKind
@@ -70,16 +70,29 @@ class DaemonApp:
         )
         assert process.stdout is not None
         stdin = process.stdin
-        send_action: Callable[[SessionActionRequest], Awaitable[None]] | None = None
+        send_action: Callable[[SessionActionRequest], Awaitable[ActionResult | None]] | None = None
         if stdin is not None:
-            async def send_action(request: SessionActionRequest) -> None:
+            async def send_action(request: SessionActionRequest) -> ActionResult:
                 message = adapter.control_message(
                     action=request.action,
                     reply_text=request.reply_text,
                 )
                 if message is None:
-                    return
+                    return failure_result(
+                        session_id=request.session_id,
+                        action=request.action,
+                        reason="unsupported_action",
+                        detail=f"{request.action} is not supported by {agent_kind.value}",
+                    )
                 await _send_process_message(stdin, message)
+                return {
+                    "type": "action_result",
+                    "session_id": request.session_id,
+                    "action": request.action,
+                    "ok": True,
+                    "reason": "delivered",
+                    "detail": f"{message} delivered",
+                }
         else:
             send_action = None
         await self.manager.start_session(

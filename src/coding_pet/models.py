@@ -12,9 +12,11 @@ class AgentKind(StrEnum):
 
 
 class AttentionState(StrEnum):
+    UNKNOWN = "unknown"
     IDLE = "idle"
     RUNNING = "running"
     NEEDS_PERMISSION = "needs_permission"
+    NEEDS_CHOICE = "needs_choice"
     NEEDS_INPUT = "needs_input"
     REVIEW_NEEDED = "review_needed"
     STALLED = "stalled"
@@ -23,12 +25,14 @@ class AttentionState(StrEnum):
 
 
 _ATTENTION_PRIORITY = {
+    AttentionState.UNKNOWN: 0,
     AttentionState.IDLE: 0,
     AttentionState.RUNNING: 10,
     AttentionState.STALLED: 20,
     AttentionState.COMPLETED: 30,
     AttentionState.REVIEW_NEEDED: 40,
     AttentionState.NEEDS_INPUT: 50,
+    AttentionState.NEEDS_CHOICE: 55,
     AttentionState.NEEDS_PERMISSION: 60,
     AttentionState.FAILED: 70,
 }
@@ -51,6 +55,23 @@ class SessionStatus(BaseModel):
     attention_score: int = Field(default=0)
     unread: bool = False
     live: bool = True
+
+    # Session source metadata. Existing launched-process sessions keep the default.
+    source_kind: str = "process"
+    tmux_pane_id: str | None = None
+    tmux_session_name: str | None = None
+    tmux_window_pane: str | None = None
+    tmux_current_command: str | None = None
+
+    # Console activity metadata.
+    last_activity_at: datetime | None = None
+    last_input_at: datetime | None = None
+    last_output_at: datetime | None = None
+    last_dashboard_input: str | None = None
+    estimated_current_request: str | None = None
+    agent_waiting_message: str | None = None
+    state_reason: str | None = None
+    output_hash: str | None = None
 
     @field_validator("attention_score", mode="before")
     @classmethod
