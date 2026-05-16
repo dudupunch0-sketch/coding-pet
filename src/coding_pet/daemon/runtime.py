@@ -8,12 +8,16 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from pathlib import Path
 
+from coding_pet.config import StateDetectionConfig, TmuxConfig
 from coding_pet.daemon.action_router import SessionActionRouter
 from coding_pet.daemon.manager import MonitorManager
 from coding_pet.daemon.session_registry import SessionRegistry
+from coding_pet.daemon.tmux_monitor import TmuxMonitorService
 from coding_pet.ipc.server import IpcServer
 from coding_pet.notifiers.base import Notifier
 from coding_pet.state_store import StateStore
+from coding_pet.tmux.client import TmuxClient
+from coding_pet.transcripts.store import TranscriptStore
 
 DEFAULT_SOCKET_NAME = "coding-pet.sock"
 MAX_SOCKET_PATH_BYTES = 100
@@ -38,6 +42,11 @@ class DaemonRuntime:
     action_router: SessionActionRouter | None = None
     ipc_server: IpcServer | None = None
     manager: MonitorManager | None = None
+    tmux_config: TmuxConfig | None = None
+    tmux_client: TmuxClient | None = None
+    transcript_store: TranscriptStore | None = None
+    state_detection_config: StateDetectionConfig | None = None
+    tmux_monitor: TmuxMonitorService | None = None
     _started: bool = field(init=False, default=False)
     _shutdown_event: asyncio.Event = field(init=False, default_factory=asyncio.Event)
 
@@ -60,8 +69,11 @@ class DaemonRuntime:
             self.ipc_server = IpcServer(
                 socket_path=default_socket_path(self.runtime_dir),
                 registry=self.registry,
+                transcript_store=self.transcript_store,
             )
         self.ipc_server.action_handler = self.action_router.handle_message
+        if self.ipc_server.transcript_store is None:
+            self.ipc_server.transcript_store = self.transcript_store
 
     @property
     def socket_path(self) -> Path:
@@ -76,7 +88,26 @@ class DaemonRuntime:
         assert self.manager is not None
         assert self.ipc_server is not None
         await self.manager.restore_from_store()
+        if self.transcript_store is not None:
+            await self.transcript_store.initialize()
         await self.ipc_server.start()
+        if self.tmux_config is not None and self.tmux_config.enabled:
+            stalled_after = timedelta(
+                seconds=(
+                    self.state_detection_config.stalled_after_sec
+                    if self.state_detection_config is not None
+                    else 300
+                )
+            )
+            self.tmux_monitor = TmuxMonitorService(
+                registry=self.registry,
+                manager=self.manager,
+                client=self.tmux_client or TmuxClient(),
+                transcript_store=self.transcript_store,
+                config=self.tmux_config,
+                stalled_after=stalled_after,
+            )
+            await self.tmux_monitor.start()
         self._started = True
 
     def request_shutdown(self) -> None:
@@ -103,6 +134,9 @@ class DaemonRuntime:
         assert self.manager is not None
         assert self.ipc_server is not None
         self.request_shutdown()
+        if self.tmux_monitor is not None:
+            await self.tmux_monitor.stop()
+            self.tmux_monitor = None
         await self.manager.stop_all_sessions()
         await self.manager.persist_snapshot()
         await self.ipc_server.stop()

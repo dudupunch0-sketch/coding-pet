@@ -125,3 +125,87 @@ async def test_ipc_ping_returns_pong(tmp_path: Path) -> None:
     finally:
         await client.close()
         await server.stop()
+
+
+
+@pytest.mark.asyncio
+async def test_ipc_forwards_press_enter_and_state_override_in_action_requests(
+    tmp_path: Path,
+) -> None:
+    registry = SessionRegistry()
+    received: list[dict[str, object]] = []
+
+    async def handle_action(message: dict[str, object]) -> dict[str, object]:
+        received.append(message)
+        return {
+            "type": "action_result",
+            "session_id": message["session_id"],
+            "action": message["action"],
+            "ok": True,
+        }
+
+    server = IpcServer(
+        socket_path=tmp_path / "coding-pet.sock",
+        registry=registry,
+        action_handler=handle_action,
+    )
+    await server.start()
+    client = IpcClient(server.socket_path)
+    try:
+        await client.connect()
+        await client.read_message()
+        await client.send({
+            "type": "action_request",
+            "session_id": "tmux-%3",
+            "action": "send_without_enter",
+            "reply_text": "  raw  ",
+            "press_enter": False,
+            "state_override": "running",
+        })
+        await client.read_message()
+    finally:
+        await client.close()
+        await server.stop()
+
+    assert received == [{
+        "type": "action_request",
+        "session_id": "tmux-%3",
+        "action": "send_without_enter",
+        "reply_text": "  raw  ",
+        "press_enter": False,
+        "state_override": "running",
+    }]
+
+
+@pytest.mark.asyncio
+async def test_ipc_serves_transcript_snapshot(tmp_path: Path) -> None:
+    from coding_pet.transcripts.store import TranscriptStore
+
+    registry = SessionRegistry()
+    store = TranscriptStore(tmp_path / "transcripts.sqlite")
+    await store.initialize()
+    await store.append(
+        session_id="tmux-%3",
+        direction="out",
+        source="tmux_capture",
+        text="hello",
+    )
+    server = IpcServer(
+        socket_path=tmp_path / "coding-pet.sock",
+        registry=registry,
+        transcript_store=store,
+    )
+    await server.start()
+    client = IpcClient(server.socket_path)
+    try:
+        await client.connect()
+        await client.read_message()
+        await client.send({"type": "transcript_request", "session_id": "tmux-%3", "limit": 5})
+        message = await client.read_message()
+    finally:
+        await client.close()
+        await server.stop()
+
+    assert message["type"] == "transcript_snapshot"
+    assert message["session_id"] == "tmux-%3"
+    assert message["events"][0]["text"] == "hello"

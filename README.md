@@ -26,6 +26,10 @@ Implemented today:
 - theme manifest and asset validation pipeline
 - `daemon run`, `widget run`, and `admin doctor` CLI runtime commands
 - daemon-owned live action routing for `send_reply`, `approve`, and `reject`
+- tmux pane discovery/capture/control modules for already-running Claude Code/OpenCode sessions
+- SQLite transcript store with timestamped `in`, `out`, and `system` events
+- rule-based tmux snapshot classifier for `needs_input`, `needs_choice`, `needs_permission`, `stalled`, and failure states
+- headless-safe detail popup/view-model/reply-box helpers for raw input forwarding
 - normalized action failure reasons for unavailable, unsupported, missing, read-only, and no-live-control-channel paths
 - explicit widget action feedback plus read-only restored-session handling
 
@@ -89,6 +93,11 @@ Show daemon monitor command help:
 PYTHONPATH=src python -m coding_pet.cli daemon monitor --help
 ```
 
+Show tmux discovery command help:
+```bash
+PYTHONPATH=src python -m coding_pet.cli daemon discover-tmux --help
+```
+
 Run the widget layer:
 ```bash
 PYTHONPATH=src python -m coding_pet.cli widget run
@@ -115,6 +124,8 @@ PYTHONPATH=src python -m coding_pet.cli admin doctor
 Expected current-server signals include:
 - `backend_claude_code=unavailable:not installed (missing 'claude')`
 - `backend_opencode=unavailable:not installed (missing 'opencode')`
+- `tmux_binary=...` and `tmux_enabled=...`
+- `transcript_db=~/.local/state/coding-pet/transcripts.sqlite` or the configured equivalent
 - `gui_runtime=unavailable` in headless/minimal environments
 
 Daemon startup smoke check:
@@ -135,6 +146,25 @@ Expected on this server:
 - prints `PySide6 GUI runtime is unavailable in this environment.` when the host lacks Qt runtime support
 
 Monitor commands for Claude Code or OpenCode still appear in the CLI, but on this server they are expected to fail fast with an unavailable-backend diagnostic instead of attempting launch.
+
+Discover already-running agent panes in tmux:
+```bash
+PYTHONPATH=src python -m coding_pet.cli daemon discover-tmux
+```
+
+Enable daemon-side tmux polling and timestamped transcripts:
+```bash
+CODING_PET_TMUX_ENABLED=1 PYTHONPATH=src python -m coding_pet.cli daemon run
+```
+The tmux path monitors existing panes discovered via `tmux list-panes`; it does not launch Claude Code/OpenCode or configure providers. User input from the detail popup is passed through with `tmux load-buffer`/`paste-buffer`, preserving Korean text, newlines, quotes, `$`, `;`, and backslashes.
+
+Capture and classify a specific pane once:
+```bash
+PYTHONPATH=src python -m coding_pet.cli daemon monitor-tmux \
+  --pane %3 \
+  --agent claude_code \
+  --title auth-fix
+```
 
 Monitor a session from source checkout:
 ```bash
@@ -159,6 +189,7 @@ By default coding-pet uses XDG-style paths:
 - state: `~/.local/state/coding-pet`
 - runtime: `${XDG_RUNTIME_DIR}/coding-pet` or `~/.local/state/coding-pet/runtime`
 - snapshot file: `~/.local/state/coding-pet/state.json`
+- transcript DB: `~/.local/state/coding-pet/transcripts.sqlite`
 - logs: `~/.local/state/coding-pet/logs`
 
 Useful overrides:
@@ -169,6 +200,11 @@ Useful overrides:
 - `CODING_PET_LOG_DIR`
 - `CODING_PET_LOG_LEVEL`
 - `CODING_PET_CAPTURE_TRANSCRIPTS`
+- `CODING_PET_TMUX_ENABLED`
+- `CODING_PET_TMUX_CAPTURE_LINES`
+- `CODING_PET_TMUX_POLL_INTERVAL_MS`
+- `CODING_PET_TRANSCRIPT_ENABLED`
+- `CODING_PET_TRANSCRIPT_DB`
 
 ## Documentation
 

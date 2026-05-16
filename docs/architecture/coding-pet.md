@@ -28,6 +28,8 @@ Files:
 - `src/coding_pet/daemon/runtime.py`
 - `src/coding_pet/daemon/action_router.py`
 - `src/coding_pet/daemon/session_registry.py`
+- `src/coding_pet/daemon/tmux_monitor.py`
+- `src/coding_pet/daemon/tmux_discovery_service.py`
 
 Responsibilities:
 - launch and monitor one async task per session
@@ -36,6 +38,8 @@ Responsibilities:
 - notify users on important state transitions
 - persist snapshots to disk for restart recovery
 - validate and route widget action requests through a daemon-owned control path
+- discover and poll already-running tmux panes when tmux monitoring is enabled
+- preserve raw dashboard input by delivering it through tmux buffers instead of shell-quoted strings
 - distinguish live sessions from restored snapshot-only sessions
 - resolve adapters through the backend registry instead of hardcoded daemon selection
 
@@ -65,7 +69,11 @@ Supported message types:
 - `snapshot`
 - `session_updated`
 - `session_removed`
+- `action_request`
 - `action_result`
+- `transcript_request`
+- `transcript_snapshot`
+- `transcript_appended`
 - `ping`
 
 Behavior:
@@ -82,11 +90,16 @@ Files:
 - `src/coding_pet/gui/bubble.py`
 - `src/coding_pet/gui/theme.py`
 - `src/coding_pet/gui/session_panel.py`
+- `src/coding_pet/gui/detail_view_model.py`
+- `src/coding_pet/gui/detail_popup.py`
+- `src/coding_pet/gui/transcript_view.py`
+- `src/coding_pet/gui/reply_box.py`
 
 Responsibilities:
 - map daemon session state to pet mood and bubble text
 - keep a stable multi-pet layout on screen
 - expose a shared panel view model for urgent sessions and actions
+- show a per-session detail popup model with target identity, last input, agent request, transcript rows, and raw reply actions
 - bootstrap from persisted snapshot before live IPC updates arrive
 - render transient success/failure action feedback without overwriting the real session summary
 - treat restored snapshot sessions as read-only in the panel
@@ -107,18 +120,24 @@ Responsibilities:
 - keep the notifier interface abstract for future DBus/audio expansion
 
 ### 7. Persistence
-File:
+Files:
 - `src/coding_pet/state_store.py`
+- `src/coding_pet/transcripts/model.py`
+- `src/coding_pet/transcripts/store.py`
 
 Responsibilities:
 - store the latest session snapshot in JSON form
 - restore known sessions after restart as non-live/read-only state
 - provide widget bootstrap state before the daemon socket is available
+- store timestamped transcript events in SQLite for tmux output, dashboard input, and system notes
 
-Default path:
+Default paths:
 - `~/.local/state/coding-pet/state.json`
+- `~/.local/state/coding-pet/transcripts.sqlite`
 
 ## Data flow
+
+### Process-launched sessions
 
 1. CLI or daemon service launches a monitored agent command.
 2. `MonitorTask` reads stdout/stderr lines asynchronously.
@@ -130,6 +149,14 @@ Default path:
 8. Panel actions such as `send_reply`, `approve`, and `reject` are sent back to the daemon as `action_request` messages.
 9. `SessionActionRouter` validates those requests and `MonitorManager` dispatches them through the live session control handler.
 10. The widget receives `action_result` acknowledgements and shows transient UI feedback until newer session output arrives.
+
+### tmux-discovered sessions
+
+1. `TmuxMonitorService` calls `tmux list-panes -a` and applies include/exclude rules.
+2. Matched Claude Code/OpenCode panes become `SessionStatus(source_kind="tmux")` entries with pane/session/cwd metadata.
+3. The monitor captures recent output with `tmux capture-pane -p -J -S -N`, diffs snapshots, and stores new output in SQLite transcripts.
+4. `AgentStateClassifier` evaluates the snapshot with deterministic patterns; no LLM call is used for status detection.
+5. Detail popup actions preserve raw text and call `tmux load-buffer`, `paste-buffer`, and optional `send-keys Enter`.
 
 ## Concurrency model
 

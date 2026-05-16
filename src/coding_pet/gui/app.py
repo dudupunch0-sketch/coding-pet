@@ -44,7 +44,7 @@ class CodingPetWidgetApp:
     _ready: asyncio.Event = field(init=False, default_factory=asyncio.Event)
 
     def ensure_app(self) -> Any:
-        from PySide6.QtWidgets import QApplication
+        from PySide6.QtWidgets import QApplication  # type: ignore[import-not-found]
 
         app = QApplication.instance()
         if app is None:

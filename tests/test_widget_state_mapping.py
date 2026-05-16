@@ -137,3 +137,12 @@ def test_session_panel_shows_multiple_agent_kinds() -> None:
     )
 
     assert {row.agent_kind for row in rows} == {AgentKind.CLAUDE_CODE, AgentKind.OPENCODE}
+
+
+def test_widget_mood_maps_needs_choice_to_thinking() -> None:
+    from coding_pet.gui.theme import WidgetMood, mood_for_status
+
+    assert (
+        mood_for_status(build_status("choice", AttentionState.NEEDS_CHOICE))
+        is WidgetMood.THINKING
+    )

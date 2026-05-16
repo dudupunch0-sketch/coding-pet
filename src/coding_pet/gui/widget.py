@@ -32,6 +32,7 @@ class CodingPetWidgetShell:
         self._widget: Any | None = None
         self._pet_label: Any | None = None
         self._bubble_label: Any | None = None
+        self._detail_popup: Any | None = None
         self._drag_origin: Any | None = None
         self._setup_qt_widget()
         self.update_status(status)
@@ -68,6 +69,17 @@ class CodingPetWidgetShell:
         self.update_status(updated)
         return updated
 
+    def open_detail_popup(self) -> Any:
+        from coding_pet.gui.detail_popup import DetailPopupShell
+
+        updated = self.open_detail_panel()
+        if self._detail_popup is None:
+            self._detail_popup = DetailPopupShell(status=updated, events=[])
+        else:
+            self._detail_popup.update(updated)
+        self._detail_popup.show()
+        return self._detail_popup
+
     def available_panel_actions(self) -> list[str]:
         return [action.value for action in self.panel.actions_for(self.status)]
 
@@ -88,15 +100,19 @@ class CodingPetWidgetShell:
 
     def _setup_qt_widget(self) -> None:
         try:
-            from PySide6.QtCore import Qt
-            from PySide6.QtGui import QFont
-            from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+            from PySide6.QtCore import Qt  # type: ignore[import-not-found]
+            from PySide6.QtGui import QFont  # type: ignore[import-not-found]
+            from PySide6.QtWidgets import (  # type: ignore[import-not-found]
+                QLabel,
+                QVBoxLayout,
+                QWidget,
+            )
         except ImportError:
             return
 
         shell = self
 
-        class _Widget(QWidget):
+        class _Widget(QWidget):  # type: ignore[misc]
             def mousePressEvent(self, event: Any) -> None:  # noqa: N802
                 if event.button() is Qt.MouseButton.LeftButton:
                     shell._drag_origin = (
@@ -110,7 +126,10 @@ class CodingPetWidgetShell:
                 super().mouseMoveEvent(event)
 
             def mouseReleaseEvent(self, event: Any) -> None:  # noqa: N802
+                was_dragging = shell._drag_origin is not None
                 shell._drag_origin = None
+                if was_dragging and event.button() is Qt.MouseButton.LeftButton:
+                    shell.open_detail_popup()
                 super().mouseReleaseEvent(event)
 
         widget = _Widget()

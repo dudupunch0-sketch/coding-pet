@@ -15,6 +15,7 @@ Minimum development/runtime expectations:
 - PySide6 Python package
 - working GUI runtime libraries for Qt
 - `notify-send` or DBus/libnotify-compatible desktop notification path
+- `tmux` when monitoring already-running Claude Code/OpenCode terminal panes
 
 Create a virtual environment and install the project:
 ```bash
@@ -105,6 +106,32 @@ Expected on this server:
 - reports `live_mode=false` when no daemon socket exists
 - prints `PySide6 GUI runtime is unavailable in this environment.` when the host lacks Qt runtime support
 
+Tmux pane discovery help:
+```bash
+PYTHONPATH=src python -m coding_pet.cli daemon discover-tmux --help
+PYTHONPATH=src python -m coding_pet.cli daemon monitor-tmux --help
+```
+
+Discover existing tmux panes:
+```bash
+PYTHONPATH=src python -m coding_pet.cli daemon discover-tmux
+```
+Expected on a host with tmux sessions:
+- matched Claude Code/OpenCode panes are shown with pane id, session name, command, cwd, and `matched`
+- other panes are shown as ignored or omitted by include/exclude rules
+
+Enable daemon-side tmux polling:
+```bash
+CODING_PET_TMUX_ENABLED=1 PYTHONPATH=src python -m coding_pet.cli daemon run
+```
+This watches already-running panes via `tmux list-panes` and `tmux capture-pane`; it does not launch agents or configure LLM providers. Detail-popup input is delivered with `tmux load-buffer` and `tmux paste-buffer`, so Korean text, newlines, quotes, `$`, `;`, and backslashes are preserved as raw text.
+
+Transcript events are stored in SQLite when transcripts are enabled:
+```text
+~/.local/state/coding-pet/transcripts.sqlite
+```
+Use `CODING_PET_TRANSCRIPT_DB` to move the DB or `CODING_PET_TRANSCRIPT_ENABLED=0` to disable transcript capture.
+
 ## Monitoring two simultaneous agents
 
 The following examples require a different server that actually has Claude Code and OpenCode installed. They are included here only as reference for a backend-capable environment, not as a smoke check for the current server.
@@ -159,6 +186,7 @@ By default coding-pet uses:
 - runtime dir: `${XDG_RUNTIME_DIR}/coding-pet`
 - logs: `~/.local/state/coding-pet/logs`
 - persisted snapshot: `~/.local/state/coding-pet/state.json`
+- transcript DB: `~/.local/state/coding-pet/transcripts.sqlite`
 
 Useful overrides:
 ```bash
@@ -167,6 +195,11 @@ export CODING_PET_STATE_DIR=/custom/state
 export CODING_PET_RUNTIME_DIR=/custom/runtime
 export CODING_PET_STATE_FILE=/custom/state/state.json
 export CODING_PET_LOG_DIR=/custom/logs
+export CODING_PET_TMUX_ENABLED=1
+export CODING_PET_TMUX_CAPTURE_LINES=200
+export CODING_PET_TMUX_POLL_INTERVAL_MS=1000
+export CODING_PET_TRANSCRIPT_DB=/custom/state/transcripts.sqlite
+export CODING_PET_TRANSCRIPT_ENABLED=1
 ```
 
 ## Troubleshooting

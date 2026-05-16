@@ -72,7 +72,7 @@ def mood_for_status(status: SessionStatus) -> WidgetMood:
         return WidgetMood.TYPING
     if status.state in {AttentionState.NEEDS_PERMISSION, AttentionState.NEEDS_INPUT}:
         return WidgetMood.ALERT
-    if status.state is AttentionState.REVIEW_NEEDED:
+    if status.state in {AttentionState.NEEDS_CHOICE, AttentionState.REVIEW_NEEDED}:
         return WidgetMood.THINKING
     if status.state is AttentionState.STALLED:
         return WidgetMood.SLEEPY

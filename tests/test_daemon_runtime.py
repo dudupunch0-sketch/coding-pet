@@ -246,6 +246,29 @@ async def test_monitor_manager_returns_reason_when_no_live_control_channel() -> 
 
 
 @pytest.mark.asyncio
+async def test_monitor_manager_rejects_unhandled_live_action() -> None:
+    registry = SessionRegistry()
+    manager = MonitorManager(registry=registry)
+    await registry.upsert(build_status("live-unhandled", AttentionState.NEEDS_INPUT))
+
+    async def unhandled(_request: SessionActionRequest) -> ActionResult | None:
+        return None
+
+    manager.register_control_channel("live-unhandled", unhandled)
+
+    result = await manager.route_action(
+        SessionActionRequest(
+            session_id="live-unhandled",
+            action="attach",
+        )
+    )
+
+    assert result["ok"] is False
+    assert result["reason"] == "unsupported_action"
+    assert result["detail"] == "attach is not supported by this session"
+
+
+@pytest.mark.asyncio
 async def test_daemon_runtime_routes_action_requests_through_router(tmp_path: Path) -> None:
     registry = SessionRegistry()
     state_store = StateStore(tmp_path / "state.json")
@@ -316,10 +339,18 @@ async def test_daemon_runtime_routes_reply_into_live_session_handler(tmp_path: P
     delivered: list[str] = []
     delivered_event = asyncio.Event()
 
-    async def action_handler(request: SessionActionRequest) -> None:
+    async def action_handler(request: SessionActionRequest) -> ActionResult:
         assert request.reply_text is not None
         delivered.append(request.reply_text)
         delivered_event.set()
+        return {
+            "type": "action_result",
+            "session_id": request.session_id,
+            "action": request.action,
+            "ok": True,
+            "reason": "delivered",
+            "detail": f"{request.reply_text} delivered",
+        }
 
     await runtime.start()
     assert runtime.manager is not None
@@ -365,9 +396,17 @@ async def test_daemon_runtime_routes_approve_into_live_session_handler(tmp_path:
     received: list[str] = []
     received_event = asyncio.Event()
 
-    async def action_handler(request: SessionActionRequest) -> None:
+    async def action_handler(request: SessionActionRequest) -> ActionResult:
         received.append(request.action)
         received_event.set()
+        return {
+            "type": "action_result",
+            "session_id": request.session_id,
+            "action": request.action,
+            "ok": True,
+            "reason": "delivered",
+            "detail": f"{request.action} delivered",
+        }
 
     await runtime.start()
     assert runtime.manager is not None
@@ -416,9 +455,17 @@ async def test_daemon_runtime_routes_reject_into_live_session_handler(tmp_path: 
     received: list[str] = []
     received_event = asyncio.Event()
 
-    async def action_handler(request: SessionActionRequest) -> None:
+    async def action_handler(request: SessionActionRequest) -> ActionResult:
         received.append(request.action)
         received_event.set()
+        return {
+            "type": "action_result",
+            "session_id": request.session_id,
+            "action": request.action,
+            "ok": True,
+            "reason": "delivered",
+            "detail": f"{request.action} delivered",
+        }
 
     await runtime.start()
     assert runtime.manager is not None
