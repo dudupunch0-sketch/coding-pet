@@ -80,3 +80,46 @@ async def test_widget_app_preserves_deterministic_layout_with_two_live_sessions(
     finally:
         await app.disconnect_from_daemon()
         await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_widget_app_tracks_transcript_snapshots_and_appends() -> None:
+    app = CodingPetWidgetApp()
+    app.show_sessions([build_status("tmux-%3", AttentionState.NEEDS_INPUT)])
+
+    await app.apply_daemon_message({
+        "type": "transcript_snapshot",
+        "session_id": "tmux-%3",
+        "events": [
+            {
+                "event_id": "out-1",
+                "session_id": "tmux-%3",
+                "ts": "2026-05-15T10:42:01+00:00",
+                "direction": "out",
+                "source": "tmux_capture",
+                "text": "어떤 브랜치로 할까요?",
+            }
+        ],
+    })
+    await app.apply_daemon_message({
+        "type": "transcript_appended",
+        "session_id": "tmux-%3",
+        "event": {
+            "event_id": "in-1",
+            "session_id": "tmux-%3",
+            "ts": "2026-05-15T10:42:02+00:00",
+            "direction": "in",
+            "source": "dashboard_input",
+            "text": "main으로 진행해",
+        },
+    })
+
+    assert [event.text for event in app.transcripts["tmux-%3"]] == [
+        "어떤 브랜치로 할까요?",
+        "main으로 진행해",
+    ]
+    popup = app.widgets["tmux-%3"].open_detail_popup()
+    assert [row.text for row in popup.view_model().transcript_rows] == [
+        "어떤 브랜치로 할까요?",
+        "main으로 진행해",
+    ]

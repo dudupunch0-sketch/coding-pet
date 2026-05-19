@@ -13,6 +13,7 @@ from coding_pet.gui.theme import (
     resolve_sprite_for_mood,
 )
 from coding_pet.models import SessionStatus
+from coding_pet.transcripts.model import TranscriptEvent
 
 
 @dataclass(slots=True)
@@ -33,6 +34,7 @@ class CodingPetWidgetShell:
         self._pet_label: Any | None = None
         self._bubble_label: Any | None = None
         self._detail_popup: Any | None = None
+        self._transcript_events: list[TranscriptEvent] = []
         self._drag_origin: Any | None = None
         self._setup_qt_widget()
         self.update_status(status)
@@ -69,16 +71,22 @@ class CodingPetWidgetShell:
         self.update_status(updated)
         return updated
 
-    def open_detail_popup(self) -> Any:
+    def open_detail_popup(self, events: list[TranscriptEvent] | None = None) -> Any:
         from coding_pet.gui.detail_popup import DetailPopupShell
 
         updated = self.open_detail_panel()
+        popup_events = list(self._transcript_events if events is None else events)
         if self._detail_popup is None:
-            self._detail_popup = DetailPopupShell(status=updated, events=[])
+            self._detail_popup = DetailPopupShell(status=updated, events=popup_events)
         else:
-            self._detail_popup.update(updated)
+            self._detail_popup.update(updated, events=popup_events)
         self._detail_popup.show()
         return self._detail_popup
+
+    def update_detail_events(self, events: list[TranscriptEvent]) -> None:
+        self._transcript_events = list(events)
+        if self._detail_popup is not None:
+            self._detail_popup.update(self.status, events=self._transcript_events)
 
     def available_panel_actions(self) -> list[str]:
         return [action.value for action in self.panel.actions_for(self.status)]

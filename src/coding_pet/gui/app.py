@@ -10,6 +10,7 @@ from coding_pet.gui.theme import WidgetTheme, default_theme
 from coding_pet.ipc.client import IpcClient
 from coding_pet.models import AttentionState, SessionStatus
 from coding_pet.state_store import StateStore
+from coding_pet.transcripts.model import TranscriptEvent
 
 ActionResult = dict[str, object]
 
@@ -38,6 +39,7 @@ class CodingPetWidgetApp:
     socket_path: Path | None = None
     state_store: StateStore | None = None
     widgets: dict[str, Any] = field(default_factory=dict)
+    transcripts: dict[str, list[TranscriptEvent]] = field(default_factory=dict)
     last_action_result: ActionResult | None = None
     _client: IpcClient | None = field(init=False, default=None)
     _listen_task: asyncio.Task[None] | None = field(init=False, default=None)
@@ -143,6 +145,15 @@ class CodingPetWidgetApp:
             payload["reply_text"] = reply_text
         await self._client.send(payload)
 
+    async def request_transcript(self, session_id: str, *, limit: int = 100) -> None:
+        if self._client is None:
+            raise RuntimeError("widget is not connected to the daemon")
+        await self._client.send({
+            "type": "transcript_request",
+            "session_id": session_id,
+            "limit": limit,
+        })
+
     async def apply_daemon_message(self, message: dict[str, Any]) -> None:
         message_type = message.get("type")
         if message_type == "snapshot":
@@ -190,3 +201,26 @@ class CodingPetWidgetApp:
                     detail=detail,
                     ok=message.get("ok") is True,
                 )
+            return
+        if message_type == "transcript_snapshot":
+            session_id = message.get("session_id")
+            if isinstance(session_id, str):
+                events = [
+                    TranscriptEvent.model_validate(item)
+                    for item in message.get("events", [])
+                    if isinstance(item, dict)
+                ]
+                self.transcripts[session_id] = events
+                self._update_widget_transcript(session_id)
+            return
+        if message_type == "transcript_appended":
+            event_data = message.get("event")
+            if isinstance(event_data, dict):
+                event = TranscriptEvent.model_validate(event_data)
+                self.transcripts.setdefault(event.session_id, []).append(event)
+                self._update_widget_transcript(event.session_id)
+
+    def _update_widget_transcript(self, session_id: str) -> None:
+        widget = self.widgets.get(session_id)
+        if widget is not None:
+            widget.update_detail_events(self.transcripts.get(session_id, []))

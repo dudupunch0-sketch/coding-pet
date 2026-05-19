@@ -17,6 +17,7 @@ from coding_pet.ipc.server import IpcServer
 from coding_pet.notifiers.base import Notifier
 from coding_pet.state_store import StateStore
 from coding_pet.tmux.client import TmuxClient
+from coding_pet.transcripts.model import TranscriptEvent
 from coding_pet.transcripts.store import TranscriptStore
 
 DEFAULT_SOCKET_NAME = "coding-pet.sock"
@@ -106,9 +107,14 @@ class DaemonRuntime:
                 transcript_store=self.transcript_store,
                 config=self.tmux_config,
                 stalled_after=stalled_after,
+                on_transcript_event=self._broadcast_transcript_event,
             )
             await self.tmux_monitor.start()
         self._started = True
+
+    async def _broadcast_transcript_event(self, event: TranscriptEvent) -> None:
+        assert self.ipc_server is not None
+        await self.ipc_server.broadcast_transcript_event(event.model_dump(mode="json"))
 
     def request_shutdown(self) -> None:
         self._shutdown_event.set()
