@@ -12,6 +12,14 @@ from coding_pet.ipc.server import IpcServer
 from coding_pet.models import AgentKind, AttentionState, SessionStatus
 
 
+class FakeClient:
+    def __init__(self) -> None:
+        self.sent: list[dict[str, object]] = []
+
+    async def send(self, payload: dict[str, object]) -> None:
+        self.sent.append(payload)
+
+
 def build_status(session_id: str, state: AttentionState) -> SessionStatus:
     from datetime import UTC, datetime
 
@@ -122,4 +130,28 @@ async def test_widget_app_tracks_transcript_snapshots_and_appends() -> None:
     assert [row.text for row in popup.view_model().transcript_rows] == [
         "어떤 브랜치로 할까요?",
         "main으로 진행해",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_widget_detail_open_requests_transcript_and_marks_read() -> None:
+    app = CodingPetWidgetApp()
+    fake_client = FakeClient()
+    status = build_status("tmux-%3", AttentionState.NEEDS_INPUT).model_copy(
+        update={
+            "source_kind": "tmux",
+            "tmux_pane_id": "%3",
+            "unread": True,
+        }
+    )
+    app.show_sessions([status])
+    app._client = fake_client  # type: ignore[assignment]
+
+    app.widgets["tmux-%3"].open_detail_popup()
+    await asyncio.sleep(0)
+
+    assert app.widgets["tmux-%3"].status.unread is False
+    assert fake_client.sent == [
+        {"type": "transcript_request", "session_id": "tmux-%3", "limit": 100},
+        {"type": "action_request", "session_id": "tmux-%3", "action": "mark_read"},
     ]

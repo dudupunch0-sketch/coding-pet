@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -23,9 +24,16 @@ class WidgetPresentation:
 
 
 class CodingPetWidgetShell:
-    def __init__(self, *, status: SessionStatus, theme: WidgetTheme) -> None:
+    def __init__(
+        self,
+        *,
+        status: SessionStatus,
+        theme: WidgetTheme,
+        on_detail_opened: Callable[[str], None] | None = None,
+    ) -> None:
         self.theme = theme
         self.status = status
+        self._on_detail_opened = on_detail_opened
         self.panel = SessionPanelViewModel()
         self.x = 0
         self.y = 0
@@ -81,6 +89,8 @@ class CodingPetWidgetShell:
         else:
             self._detail_popup.update(updated, events=popup_events)
         self._detail_popup.show()
+        if self._on_detail_opened is not None:
+            self._on_detail_opened(updated.session_id)
         return self._detail_popup
 
     def update_detail_events(self, events: list[TranscriptEvent]) -> None:

@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from coding_pet.gui.session_panel import PanelAction
 from coding_pet.gui.theme import WidgetTheme, default_theme
 from coding_pet.ipc.client import IpcClient
 from coding_pet.models import AttentionState, SessionStatus
@@ -80,7 +81,11 @@ class CodingPetWidgetApp:
             if widget is None:
                 from coding_pet.gui.widget import CodingPetWidgetShell
 
-                widget = CodingPetWidgetShell(status=status, theme=self.theme)
+                widget = CodingPetWidgetShell(
+                    status=status,
+                    theme=self.theme,
+                    on_detail_opened=self._on_widget_detail_opened,
+                )
                 self.widgets[status.session_id] = widget
             widget.update_status(status)
             x, y = positions[status.session_id]
@@ -190,11 +195,8 @@ class CodingPetWidgetApp:
             ):
                 widget = self.widgets[session_id]
                 updated = widget.status.model_copy(update={
-                    "state": (
-                        AttentionState.RUNNING
-                        if message.get("ok") is True
-                        else widget.status.state
-                    ),
+                    "state": self._state_after_action_result(widget.status, message),
+                    "unread": self._unread_after_action_result(widget.status, message),
                 })
                 widget.update_status(updated, clear_feedback=False)
                 widget.apply_action_feedback(
@@ -224,3 +226,41 @@ class CodingPetWidgetApp:
         widget = self.widgets.get(session_id)
         if widget is not None:
             widget.update_detail_events(self.transcripts.get(session_id, []))
+
+    def _on_widget_detail_opened(self, session_id: str) -> None:
+        if self._client is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        loop.create_task(self._send_detail_opened_requests(session_id))
+
+    async def _send_detail_opened_requests(self, session_id: str) -> None:
+        if self._client is None:
+            return
+        await self.request_transcript(session_id)
+        await self.send_panel_action(
+            session_id=session_id,
+            action=PanelAction.MARK_READ,
+        )
+
+    def _state_after_action_result(
+        self,
+        status: SessionStatus,
+        message: dict[str, Any],
+    ) -> AttentionState:
+        if message.get("ok") is not True:
+            return status.state
+        if message.get("action") in {"send_reply", "send_without_enter", "approve", "reject"}:
+            return AttentionState.RUNNING
+        return status.state
+
+    def _unread_after_action_result(
+        self,
+        status: SessionStatus,
+        message: dict[str, Any],
+    ) -> bool:
+        if message.get("ok") is True and message.get("action") == "mark_read":
+            return False
+        return status.unread
