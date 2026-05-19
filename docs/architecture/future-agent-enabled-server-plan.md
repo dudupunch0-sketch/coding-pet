@@ -2,7 +2,7 @@
 
 ## Goal
 
-Start this plan only after current-server hardening is complete. Extend `coding-pet` on a backend-capable server so real installed and internal backends can run through a richer shared daemon contract with negotiated capabilities, backend-native action semantics, transcript/process integration, and real-backend validation.
+Start this plan only after current-server hardening is complete. Extend `coding-pet` on a backend-capable server so real installed and internal backends can run through a richer shared daemon contract with negotiated capabilities, backend-native action semantics, backend-native transcript/process integration beyond the current tmux path, and real-backend validation.
 
 ## Assumptions for the Future Server
 
@@ -17,6 +17,7 @@ Start this plan only after current-server hardening is complete. Extend `coding-
 - Current-server hardening exit criteria are met.
 - `src/coding_pet/daemon/app.py` no longer hardcodes adapter selection.
 - Degraded-mode failures are normalized for unavailable, unsupported, read-only, and dead-session cases.
+- The current tmux path already provides discovery/capture/control, SQLite transcripts, and IPC transcript snapshot/appended-event updates without requiring local Claude Code/OpenCode installs.
 - Backend-less tests pass without requiring Claude Code or OpenCode.
 - Docs clearly separate constrained-server behavior from future backend-capable behavior.
 
@@ -24,7 +25,7 @@ Start this plan only after current-server hardening is complete. Extend `coding-
 
 - Richer capability negotiation and per-session supported-action exposure.
 - Backend-native reply, approve, and reject semantics.
-- Transcript and process integration expansion.
+- Backend-native transcript/process integration beyond the current tmux SQLite transcript path.
 - Internal or company backend support.
 - Real-backend validation against installed tools.
 - Any operator workflow or tooling whose value depends on real backends being present.
@@ -43,9 +44,9 @@ Start this plan only after current-server hardening is complete. Extend `coding-
 - Let adapters return richer action outcomes such as accepted, rejected, timed out, unsupported, or backend-failed.
 - Preserve a backend-agnostic IPC contract while allowing backend-specific logic to stay inside adapters.
 
-### 3. Transcript and Process Integration Expansion
+### 3. Backend-Native Transcript and Process Integration Expansion
 
-- Promote transcript capture from a lightweight runtime concern into a durable session artifact with redaction and retention controls.
+- Extend the current SQLite transcript path with backend-native history, redaction, and retention controls.
 - Correlate backend output, daemon-issued actions, timestamps, process state, and reconnect boundaries.
 - Support backends that expose richer history than raw process output.
 

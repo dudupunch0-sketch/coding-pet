@@ -124,13 +124,15 @@ Enable daemon-side tmux polling:
 ```bash
 CODING_PET_TMUX_ENABLED=1 PYTHONPATH=src python -m coding_pet.cli daemon run
 ```
-This watches already-running panes via `tmux list-panes` and `tmux capture-pane`; it does not launch agents or configure LLM providers. Detail-popup input is delivered with `tmux load-buffer` and `tmux paste-buffer`, so Korean text, newlines, quotes, `$`, `;`, and backslashes are preserved as raw text.
+This watches already-running panes via `tmux list-panes` and `tmux capture-pane`; it does not launch agents or configure LLM providers. When the daemon receives a tmux `send_reply` or `send_without_enter` action request, text is delivered with `tmux load-buffer` and `tmux paste-buffer`, so Korean text, newlines, quotes, `$`, `;`, and backslashes are preserved as raw text.
 
 Transcript events are stored in SQLite when transcripts are enabled:
 ```text
 ~/.local/state/coding-pet/transcripts.sqlite
 ```
 Use `CODING_PET_TRANSCRIPT_DB` to move the DB or `CODING_PET_TRANSCRIPT_ENABLED=0` to disable transcript capture.
+
+Connected widgets keep detail popups fresh through the daemon IPC transcript path. Opening a detail popup sends `transcript_request` with `limit=100`, sends a daemon `mark_read` action, and applies later `transcript_snapshot`/`transcript_appended` messages to the popup model.
 
 ## Monitoring two simultaneous agents
 
@@ -198,8 +200,12 @@ export CODING_PET_LOG_DIR=/custom/logs
 export CODING_PET_TMUX_ENABLED=1
 export CODING_PET_TMUX_CAPTURE_LINES=200
 export CODING_PET_TMUX_POLL_INTERVAL_MS=1000
+export CODING_PET_TMUX_INCLUDE_SESSION_PATTERNS='claude-*,opencode-*,agent-*'
+export CODING_PET_TMUX_INCLUDE_COMMANDS='claude,opencode'
+export CODING_PET_TMUX_EXCLUDE_SESSION_PATTERNS=''
 export CODING_PET_TRANSCRIPT_DB=/custom/state/transcripts.sqlite
 export CODING_PET_TRANSCRIPT_ENABLED=1
+export CODING_PET_STALLED_AFTER_SEC=300
 ```
 
 ## Troubleshooting
@@ -220,6 +226,12 @@ export CODING_PET_TRANSCRIPT_ENABLED=1
 - verify `CODING_PET_STATE_FILE` is not pointing to a protected path
 - check `~/.local/state/coding-pet/state.json`
 
+### Detail popup transcript is empty or stale
+- verify `CODING_PET_TRANSCRIPT_ENABLED=1`
+- verify `CODING_PET_TRANSCRIPT_DB` points to a writable SQLite path
+- verify the widget is connected to the live daemon socket, not only a restored snapshot
+- run `PYTHONPATH=src python -m coding_pet.cli admin doctor` and check `transcript_db`, `transcript_enabled`, and `runtime_socket_exists`
+
 ### CLI commands appear missing
 If you are running from a source checkout, prefer:
 ```bash
@@ -231,5 +243,7 @@ This avoids importing an older editable install from a different checkout.
 
 - the action transport into live sessions currently writes simple adapter-defined control messages to monitored process stdin; this still needs validation against real Claude Code/OpenCode workflows
 - the GUI shell still depends on a full PySide6/Qt runtime, which is unavailable in the current headless test environment
+- full PySide6 detail-popup send/attach button wiring still needs target-host validation; the daemon tmux action path and headless request builders are covered by automated tests
 - restored snapshot sessions are intentionally read-only until a live daemon connection replaces them with active sessions
 - asset/theme pack is still placeholder quality
+- transcript capture is a bounded tmux screen-diff log and does not yet provide robust secret redaction or perfect terminal replay

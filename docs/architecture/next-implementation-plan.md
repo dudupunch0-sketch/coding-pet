@@ -1,12 +1,12 @@
 # Next Implementation Plan
 
-Last updated: 2026-04-19
+Last updated: 2026-05-19
 
 > Note: this earlier live-control-loop plan was written before we split execution into two server-specific tracks.
 > Use these newer plans as the primary source of truth:
 > - `docs/architecture/current-server-hardening-plan.md`
 > - `docs/architecture/future-agent-enabled-server-plan.md`
-> This file is now historical context for the live-control-loop work that has already been largely completed.
+> This file is now historical context for live-control-loop work that has landed: daemon action routing, widget action feedback, restored-session read-only handling, tmux discovery/capture/control, and transcript IPC refresh are implemented. README and `docs/architecture/coding-pet.md` are the current code contract. Sections below are preserved from the original plan and may mention missing work that has since landed.
 
 ## Objective
 

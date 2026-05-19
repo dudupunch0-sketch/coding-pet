@@ -1,6 +1,6 @@
 # Current Server Hardening Status
 
-Last verified: 2026-05-06
+Last verified: 2026-05-19
 
 ## Goal
 
@@ -26,6 +26,8 @@ Completed hardening:
 - `DaemonApp` resolves adapters through the backend registry instead of hardcoded daemon-side selection.
 - Daemon action failures use stable reason strings for degraded paths.
 - Widget action feedback preserves real session summaries and treats restored sessions as read-only.
+- Tmux discovery/capture/control exists for already-running Claude Code/OpenCode panes without installing those CLIs on this server.
+- SQLite transcripts, IPC transcript snapshots, and `transcript_appended` broadcasts support detail-popup transcript refresh.
 - Backend-less tests cover unavailable backends, degraded action handling, restored/read-only sessions, and widget feedback behavior.
 - Docs and smoke checks explicitly describe the constrained-server behavior.
 
@@ -46,11 +48,11 @@ systemd-analyze verify \
   packaging/systemd/coding-pet.target
 ```
 
-2026-05-06 result:
+2026-05-19 result:
 
-- `96 passed`
+- `142 passed`
 - `ruff`: all checks passed
-- `mypy`: no issues found in 52 source files
+- `mypy`: no issues found in 78 source files
 - `compileall`: passed
 - `systemd-analyze verify`: passed
 
@@ -60,6 +62,7 @@ Runtime smoke checks:
 PYTHONPATH=src python -m coding_pet.cli admin doctor
 CODING_PET_DAEMON_ONESHOT=1 PYTHONPATH=src python -m coding_pet.cli daemon run
 PYTHONPATH=src python -m coding_pet.cli widget run
+PYTHONPATH=src python -m coding_pet.cli daemon discover-tmux
 PYTHONPATH=src python -m coding_pet.cli daemon monitor \
   --agent claude_code \
   --cmd "claude code 'summarize'" \
@@ -72,6 +75,7 @@ Expected constrained-server signals:
 - `backend_opencode=unavailable:not installed (missing 'opencode')`
 - `daemon run` in oneshot mode prints `coding-pet daemon ready ...` and exits cleanly.
 - `widget run` prints runtime/state information and gracefully reports unavailable GUI runtime when Qt cannot start.
+- `discover-tmux` lists current panes and marks non-agent panes as ignored when no matching Claude/OpenCode rules apply.
 - `daemon monitor` exits non-zero before launch with an unavailable-backend diagnostic.
 
 ## Remaining Work on This Server
@@ -89,7 +93,7 @@ The following are intentionally out of scope for the current constrained server 
 
 - Rich per-session capability negotiation beyond simple availability/support checks.
 - Backend-native reply, approve, and reject semantics validated against real installed backends.
-- Transcript and process integration expansion beyond the current lightweight runtime path.
+- Backend-native transcript/process integration beyond the current tmux SQLite transcript path and IPC snapshot/appended-event contract.
 - Internal/company backend support, including endpoint and credential handling.
 - Real-backend integration testing, mixed-backend validation, and backend-specific operator workflows.
 

@@ -28,10 +28,12 @@ Implemented today:
 - daemon-owned live action routing for `send_reply`, `approve`, and `reject`
 - tmux pane discovery/capture/control modules for already-running Claude Code/OpenCode sessions
 - SQLite transcript store with timestamped `in`, `out`, and `system` events
+- IPC transcript snapshot requests plus appended-event streaming to connected widgets
 - rule-based tmux snapshot classifier for `needs_input`, `needs_choice`, `needs_permission`, `stalled`, and failure states
-- headless-safe detail popup/view-model/reply-box helpers for raw input forwarding
+- headless-safe detail popup/view-model/reply-box helpers for raw tmux action request construction
 - normalized action failure reasons for unavailable, unsupported, missing, read-only, and no-live-control-channel paths
 - explicit widget action feedback plus read-only restored-session handling
+- detail-popup open flow that requests the latest transcript and sends a daemon `mark_read` action
 
 Still in progress:
 - validating agent-specific control semantics against real Claude Code/OpenCode behavior
@@ -156,7 +158,9 @@ Enable daemon-side tmux polling and timestamped transcripts:
 ```bash
 CODING_PET_TMUX_ENABLED=1 PYTHONPATH=src python -m coding_pet.cli daemon run
 ```
-The tmux path monitors existing panes discovered via `tmux list-panes`; it does not launch Claude Code/OpenCode or configure providers. User input from the detail popup is passed through with `tmux load-buffer`/`paste-buffer`, preserving Korean text, newlines, quotes, `$`, `;`, and backslashes.
+The tmux path monitors existing panes discovered via `tmux list-panes`; it does not launch Claude Code/OpenCode or configure providers. When the daemon receives a tmux `send_reply` or `send_without_enter` action request, it passes text through with `tmux load-buffer`/`paste-buffer`, preserving Korean text, newlines, quotes, `$`, `;`, and backslashes.
+
+When a connected widget opens a detail popup, it marks the local row read, requests the latest 100 transcript events from the daemon, sends a daemon-side `mark_read` action, and refreshes the popup when `transcript_snapshot` or `transcript_appended` messages arrive.
 
 Capture and classify a specific pane once:
 ```bash
@@ -203,8 +207,12 @@ Useful overrides:
 - `CODING_PET_TMUX_ENABLED`
 - `CODING_PET_TMUX_CAPTURE_LINES`
 - `CODING_PET_TMUX_POLL_INTERVAL_MS`
+- `CODING_PET_TMUX_INCLUDE_SESSION_PATTERNS`
+- `CODING_PET_TMUX_INCLUDE_COMMANDS`
+- `CODING_PET_TMUX_EXCLUDE_SESSION_PATTERNS`
 - `CODING_PET_TRANSCRIPT_ENABLED`
 - `CODING_PET_TRANSCRIPT_DB`
+- `CODING_PET_STALLED_AFTER_SEC`
 
 ## Documentation
 
@@ -215,6 +223,8 @@ Useful overrides:
 
 - `python -m coding_pet.cli daemon run` and `widget run` now exist, but the current host still lacks a real PySide6/Qt runtime for manual GUI exercise
 - live panel actions are routed through adapter-defined stdin control messages; per-agent approval/rejection semantics still need validation against real Claude Code/OpenCode sessions
+- full PySide6 detail-popup button wiring and manual GUI UX still need target-host validation even though the daemon tmux action path and headless request helpers are tested
 - restored snapshot sessions are intentionally read-only until a live daemon snapshot replaces them
 - `daemon monitor` for Claude Code and OpenCode is intentionally fail-fast on this server because those backends are not installed locally
 - the GUI shell falls back gracefully when PySide6 runtime libraries are unavailable
+- tmux transcript rows are bounded screen-diff events, not a perfect terminal recording; disable or relocate the transcript DB if a workspace may print sensitive text

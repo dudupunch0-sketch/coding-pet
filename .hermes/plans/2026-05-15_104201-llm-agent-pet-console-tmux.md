@@ -1,5 +1,7 @@
 # LLM Agent Pet Console tmux 통합 구현 계획
 
+> **Status as of 2026-05-19:** current-server implementation has landed. The repo now includes tmux discovery/capture/control, SQLite transcripts, deterministic tmux snapshot classification, daemon-side tmux monitoring, IPC transcript request/snapshot/appended messages, detail-popup/reply-box helpers, action feedback, and updated operations/architecture docs. Target RHEL GUI smoke with real Claude Code/OpenCode remains the manual follow-up. The task list below is preserved as the original implementation checklist and may describe files or enum values that were missing when the plan was written.
+
 > **For Hermes/Codex:** 구현을 시작할 때는 이 계획을 task-by-task로 실행한다. GUI/daemon/runtime 경계를 건드리므로 `subagent-driven-development` 방식으로 작은 단위 구현 + 테스트 + 리뷰를 반복한다.
 
 **Goal:** 기존 `coding-pet` 구조를 유지하면서, 이미 tmux 안에서 실행 중인 Claude Code/OpenCode pane들을 pet widget으로 표시하고, 상세 팝업에서 transcript를 보고 raw input을 tmux pane으로 그대로 전달하는 사내 LLM Agent Pet Console을 구현한다.
@@ -12,7 +14,7 @@
 
 ## 0. 계획 범위와 금지 사항
 
-이번 문서는 planning-only 산출물이다. 이 계획 파일 외의 소스/테스트/문서는 아직 변경하지 않는다.
+이번 문서는 원래 planning-only 산출물로 작성되었고, 현재는 구현 완료 후 historical checklist/handoff 문서로 보존한다. 최신 사용자-facing 계약은 `README.md`, `docs/architecture/coding-pet.md`, `docs/operations/rhel8-setup.md`를 따른다.
 
 구현 시 유지할 원칙:
 

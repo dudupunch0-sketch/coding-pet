@@ -81,6 +81,8 @@ Behavior:
 - later updates stream incrementally
 - widget action requests are sent back over the same socket and acknowledged with `action_result`
 - `action_result` now carries a stable `reason` string for degraded failures such as unavailable backends, inactive sessions, or missing live control
+- `transcript_request` returns recent transcript rows for one session, or an empty `ok=false` snapshot when transcripts are unavailable
+- daemon-side transcript appends are broadcast as `transcript_appended` so an open detail popup can stay current
 - reconnecting widgets can rebuild state without restarting the daemon
 
 ### 5. Widget layer
@@ -99,10 +101,11 @@ Responsibilities:
 - map daemon session state to pet mood and bubble text
 - keep a stable multi-pet layout on screen
 - expose a shared panel view model for urgent sessions and actions
-- show a per-session detail popup model with target identity, last input, agent request, transcript rows, and raw reply actions
+- show a per-session detail popup model with target identity, last input, agent request, transcript rows, and raw reply action request helpers
 - bootstrap from persisted snapshot before live IPC updates arrive
 - render transient success/failure action feedback without overwriting the real session summary
 - treat restored snapshot sessions as read-only in the panel
+- on detail-popup open, request the latest transcript snapshot and send `mark_read`; later `transcript_snapshot` and `transcript_appended` messages update the popup model
 
 Current implementation notes:
 - the shell supports a PySide6-backed UI when runtime libraries are present
@@ -154,9 +157,9 @@ Default paths:
 
 1. `TmuxMonitorService` calls `tmux list-panes -a` and applies include/exclude rules.
 2. Matched Claude Code/OpenCode panes become `SessionStatus(source_kind="tmux")` entries with pane/session/cwd metadata.
-3. The monitor captures recent output with `tmux capture-pane -p -J -S -N`, diffs snapshots, and stores new output in SQLite transcripts.
+3. The monitor captures recent output with `tmux capture-pane -p -J -S -N`, diffs snapshots, stores new output in SQLite transcripts, and best-effort broadcasts appended transcript events to connected widgets.
 4. `AgentStateClassifier` evaluates the snapshot with deterministic patterns; no LLM call is used for status detection.
-5. Detail popup actions preserve raw text and call `tmux load-buffer`, `paste-buffer`, and optional `send-keys Enter`.
+5. Daemon tmux action handlers for `send_reply` and `send_without_enter` preserve raw text and call `tmux load-buffer`, `paste-buffer`, and optional `send-keys Enter`.
 
 ## Concurrency model
 
@@ -177,5 +180,7 @@ Default paths:
 
 - actual agent-native approval/rejection semantics are still stdin-string based placeholders rather than proven per-agent protocols
 - the PySide6 environment on this host is still unavailable for real manual GUI runs, so some UX work remains test-driven only
+- full PySide6 detail-popup send/attach button wiring still needs target-host validation; the daemon action handlers and headless request builders are covered by tests
 - this server still uses constrained degraded-mode operation for Claude Code/OpenCode because those binaries are not installed locally
 - sprite/theme assets are still placeholder quality
+- transcript capture is a bounded tmux screen-diff log; robust redaction and perfect TTY replay are future work
