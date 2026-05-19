@@ -85,6 +85,37 @@ async def test_widget_receives_action_result_message_without_overwriting_session
 
 
 @pytest.mark.asyncio
+async def test_widget_mark_read_feedback_preserves_attention_state(tmp_path: Path) -> None:
+    registry = SessionRegistry()
+    await registry.upsert(
+        build_status("alpha", AttentionState.NEEDS_INPUT).model_copy(update={"unread": True})
+    )
+    server = IpcServer(socket_path=tmp_path / "coding-pet.sock", registry=registry)
+    await server.start()
+
+    try:
+        app = CodingPetWidgetApp(socket_path=server.socket_path)
+        await app.connect_to_daemon(message_limit=1)
+        await app.apply_daemon_message(
+            {
+                "type": "action_result",
+                "session_id": "alpha",
+                "action": "mark_read",
+                "ok": True,
+                "detail": "session marked read",
+            }
+        )
+
+        widget = app.widgets["alpha"]
+        assert widget.status.state is AttentionState.NEEDS_INPUT
+        assert widget.status.unread is False
+        assert widget.presentation().bubble_text == "Action sent: session marked read"
+    finally:
+        await app.disconnect_from_daemon()
+        await server.stop()
+
+
+@pytest.mark.asyncio
 async def test_widget_shows_normalized_failure_reason_feedback(tmp_path: Path) -> None:
     registry = SessionRegistry()
     await registry.upsert(build_status("alpha", AttentionState.NEEDS_INPUT))
