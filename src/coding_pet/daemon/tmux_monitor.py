@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
@@ -15,7 +16,10 @@ from coding_pet.tmux.client import TmuxClient
 from coding_pet.tmux.control import send_raw_text_to_tmux_pane
 from coding_pet.tmux.discovery import discover_agent_panes
 from coding_pet.tmux.models import MatchedTmuxPane, TmuxPaneInfo
+from coding_pet.transcripts.model import TranscriptDirection, TranscriptEvent, TranscriptSource
 from coding_pet.transcripts.store import TranscriptStore
+
+TranscriptEventCallback = Callable[[TranscriptEvent], Awaitable[None]]
 
 
 def session_id_for_pane(pane: TmuxPaneInfo) -> str:
@@ -36,6 +40,7 @@ class TmuxMonitorService:
     transcript_store: TranscriptStore | None
     config: TmuxConfig
     stalled_after: timedelta = timedelta(seconds=300)
+    on_transcript_event: TranscriptEventCallback | None = None
     classifier: AgentStateClassifier = field(init=False)
     _pane_states: dict[str, _PaneState] = field(default_factory=dict)
     _known_tmux_sessions: set[str] = field(default_factory=set)
@@ -126,7 +131,7 @@ class TmuxMonitorService:
             new_output = new_output_from_snapshot(previous_snapshot, snapshot)
         state.previous_snapshot = snapshot
         if new_output and self.transcript_store is not None:
-            await self.transcript_store.append(
+            await self._append_transcript_event(
                 session_id=session_id,
                 direction="out",
                 source="tmux_capture",
@@ -271,7 +276,7 @@ class TmuxMonitorService:
         text = request.reply_text or ""
         now = datetime.now(UTC)
         if self.transcript_store is not None:
-            await self.transcript_store.append(
+            await self._append_transcript_event(
                 session_id=request.session_id,
                 direction="in",
                 source="dashboard_input",
@@ -288,7 +293,7 @@ class TmuxMonitorService:
             )
         except Exception as exc:
             if self.transcript_store is not None:
-                await self.transcript_store.append(
+                await self._append_transcript_event(
                     session_id=request.session_id,
                     direction="system",
                     source="system",
@@ -322,6 +327,34 @@ class TmuxMonitorService:
             "reason": "delivered",
             "detail": f"input delivered to tmux pane {current.tmux_pane_id}",
         }
+
+    async def _append_transcript_event(
+        self,
+        *,
+        session_id: str,
+        direction: TranscriptDirection,
+        source: TranscriptSource,
+        text: str,
+        ts: datetime,
+    ) -> TranscriptEvent | None:
+        if self.transcript_store is None:
+            return None
+        event = await self.transcript_store.append(
+            session_id=session_id,
+            direction=direction,
+            source=source,
+            text=text,
+            ts=ts,
+        )
+        if self.on_transcript_event is not None:
+            try:
+                await self.on_transcript_event(event)
+            except Exception:
+                # Transcript broadcast is best-effort; storing the event and
+                # keeping tmux monitoring alive is more important than a single
+                # client notification.
+                pass
+        return event
 
     def _snippet(self, text: str, *, limit: int = 500) -> str:
         compact = "\n".join(line.rstrip() for line in text.splitlines() if line.strip())

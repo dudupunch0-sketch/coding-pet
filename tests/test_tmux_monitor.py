@@ -13,6 +13,7 @@ from coding_pet.daemon.tmux_monitor import TmuxMonitorService
 from coding_pet.models import AgentKind, AttentionState, SessionStatus
 from coding_pet.tmux.capture import snapshot_hash
 from coding_pet.tmux.client import TmuxClient, TmuxCommandResult
+from coding_pet.transcripts.model import TranscriptEvent
 from coding_pet.transcripts.store import TranscriptStore
 
 
@@ -39,6 +40,11 @@ async def test_tmux_monitor_poll_discovers_captures_classifies_and_routes_input(
     tmp_path: Path,
 ) -> None:
     runner = FakeRunner()
+    broadcasted: list[tuple[str, str]] = []
+
+    async def on_transcript_event(event: TranscriptEvent) -> None:
+        broadcasted.append((event.direction, event.text))
+
     registry = SessionRegistry()
     manager = MonitorManager(registry=registry)
     transcript_store = TranscriptStore(tmp_path / "transcripts.sqlite")
@@ -50,6 +56,7 @@ async def test_tmux_monitor_poll_discovers_captures_classifies_and_routes_input(
         transcript_store=transcript_store,
         config=TmuxConfig(enabled=True, poll_interval_ms=10),
         stalled_after=timedelta(seconds=300),
+        on_transcript_event=on_transcript_event,
     )
 
     await service.poll_once()
@@ -79,6 +86,10 @@ async def test_tmux_monitor_poll_discovers_captures_classifies_and_routes_input(
     assert updated.last_dashboard_input == "  stage 환경  "
     events = await transcript_store.list_recent_events("tmux-%3", 10)
     assert [event.direction for event in events] == ["out", "in"]
+    assert broadcasted == [
+        ("out", "Need clarification: which env?"),
+        ("in", "  stage 환경  "),
+    ]
 
 
 @pytest.mark.asyncio

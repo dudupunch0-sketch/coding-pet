@@ -209,3 +209,40 @@ async def test_ipc_serves_transcript_snapshot(tmp_path: Path) -> None:
     assert message["type"] == "transcript_snapshot"
     assert message["session_id"] == "tmux-%3"
     assert message["events"][0]["text"] == "hello"
+
+
+@pytest.mark.asyncio
+async def test_ipc_broadcasts_appended_transcript_events(tmp_path: Path) -> None:
+    registry = SessionRegistry()
+    server = IpcServer(socket_path=tmp_path / "coding-pet.sock", registry=registry)
+    await server.start()
+    client = IpcClient(server.socket_path)
+    try:
+        await client.connect()
+        await client.read_message()
+
+        await server.broadcast_transcript_event({
+            "event_id": "event-1",
+            "session_id": "tmux-%3",
+            "ts": "2026-05-15T10:42:01+00:00",
+            "direction": "out",
+            "source": "tmux_capture",
+            "text": "새 출력",
+        })
+        message = await client.read_message()
+    finally:
+        await client.close()
+        await server.stop()
+
+    assert message == {
+        "type": "transcript_appended",
+        "session_id": "tmux-%3",
+        "event": {
+            "event_id": "event-1",
+            "session_id": "tmux-%3",
+            "ts": "2026-05-15T10:42:01+00:00",
+            "direction": "out",
+            "source": "tmux_capture",
+            "text": "새 출력",
+        },
+    }
