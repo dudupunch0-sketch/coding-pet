@@ -1,0 +1,13 @@
+{
+  "theme": "pmd-eevee",
+  "sprites": {
+    "idle": "pmd-eevee/idle.png",
+    "typing": "pmd-eevee/typing.png",
+    "celebrate": "pmd-eevee/celebrate.png",
+    "alert": "pmd-eevee/alert.png",
+    "thinking": "pmd-eevee/thinking.png",
+    "sleepy": "pmd-eevee/sleepy.png",
+    "sad": "pmd-eevee/sad.png"
+  },
+  "audio": {}
+}

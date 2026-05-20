@@ -21,7 +21,9 @@ from coding_pet.gui.runtime import gui_runtime_status
 from coding_pet.gui.theme import (
     default_assets_root,
     default_theme_manifest_path,
+    default_theme_registry_path,
     load_theme_manifest,
+    load_theme_registry,
     validate_theme_assets,
 )
 from coding_pet.models import AgentKind
@@ -285,6 +287,16 @@ def admin_doctor() -> None:
         )
         typer.echo(f"theme={manifest.name}")
         typer.echo(f"theme_missing_assets={missing_summary}")
+    try:
+        registry_manifest = load_theme_registry(default_theme_registry_path(assets_root))
+    except Exception as exc:
+        typer.echo(f"theme_registry=unavailable:{exc}")
+    else:
+        spritecollab_count = sum(
+            1 for entry in registry_manifest.themes if entry.theme.startswith("pmd-")
+        )
+        typer.echo(f"theme_registry_count={len(registry_manifest.themes)}")
+        typer.echo(f"theme_spritecollab_count={spritecollab_count}")
     runtime_socket = config.runtime_dir / "coding-pet.sock"
     typer.echo(f"runtime_socket_exists={str(runtime_socket.exists()).lower()}")
     typer.echo(f"path_status_config_dir={_path_health(config.config_dir)}")

@@ -1,0 +1,13 @@
+{
+  "theme": "pmd-ralts",
+  "sprites": {
+    "idle": "pmd-ralts/idle.png",
+    "typing": "pmd-ralts/typing.png",
+    "celebrate": "pmd-ralts/celebrate.png",
+    "alert": "pmd-ralts/alert.png",
+    "thinking": "pmd-ralts/thinking.png",
+    "sleepy": "pmd-ralts/sleepy.png",
+    "sad": "pmd-ralts/sad.png"
+  },
+  "audio": {}
+}

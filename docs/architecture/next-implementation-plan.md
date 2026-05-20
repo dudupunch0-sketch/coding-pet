@@ -24,7 +24,7 @@ Implemented today:
 - Restored snapshot sessions are treated as read-only until a live daemon snapshot replaces them.
 - Optional Claude Code/OpenCode backends remain registered, but missing binaries fail fast with explicit diagnostics.
 - Tmux monitoring can discover already-running panes, capture bounded transcript rows, and deliver raw reply text via tmux buffers.
-- The default sprite theme is the internal `company-pet` PNG theme, with the classic text theme retained as fallback.
+- The default sprite theme is the internal `company-pet` PNG theme, with the classic text theme retained as fallback and 20 PMD SpriteCollab sample character themes registered as optional choices.
 - Systemd user units and wheel shared-data packaging are locally verified.
 
 Latest local verification result:
@@ -35,7 +35,7 @@ ruff: All checks passed!
 mypy: no issues found in 80 source files
 compileall: passed
 systemd-analyze verify: passed
-pip wheel: passed, including company-pet assets and systemd shared-data files
+pip wheel: passed, including company-pet assets, classic fallback, 20 PMD SpriteCollab sample themes, theme registry, and systemd shared-data files
 ```
 
 ## What Remains
@@ -46,7 +46,7 @@ The remaining work is no longer the generic live-control-loop implementation fro
 - Validate user-systemd startup on the target host with real `DISPLAY`/`WAYLAND_DISPLAY`/`XDG_RUNTIME_DIR` values.
 - Validate Claude Code/OpenCode reply, approve, and reject semantics against real installed backends in disposable workspaces.
 - Add any approved internal/company backend through the daemon adapter/registry boundary, not in widget code.
-- Decide final company asset/brand policy if the internal `company-pet` pilot art is not sufficient.
+- Decide final company asset/brand policy if the internal `company-pet` pilot art and CC BY-NC PMD sample themes are not sufficient.
 
 ## Closed Historical Phases
 

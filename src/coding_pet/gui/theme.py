@@ -25,6 +25,50 @@ class WidgetMood(StrEnum):
 class WidgetTheme(StrEnum):
     CLASSIC = "classic"
     COMPANY_PET = "company-pet"
+    PMD_BULBASAUR = "pmd-bulbasaur"
+    PMD_CHARMANDER = "pmd-charmander"
+    PMD_SQUIRTLE = "pmd-squirtle"
+    PMD_PIKACHU = "pmd-pikachu"
+    PMD_JIGGLYPUFF = "pmd-jigglypuff"
+    PMD_MEOWTH = "pmd-meowth"
+    PMD_MACHOP = "pmd-machop"
+    PMD_EEVEE = "pmd-eevee"
+    PMD_CHIKORITA = "pmd-chikorita"
+    PMD_CYNDAQUIL = "pmd-cyndaquil"
+    PMD_TOTODILE = "pmd-totodile"
+    PMD_PICHU = "pmd-pichu"
+    PMD_UMBREON = "pmd-umbreon"
+    PMD_MURKROW = "pmd-murkrow"
+    PMD_SNEASEL = "pmd-sneasel"
+    PMD_TREECKO = "pmd-treecko"
+    PMD_TORCHIC = "pmd-torchic"
+    PMD_MUDKIP = "pmd-mudkip"
+    PMD_RALTS = "pmd-ralts"
+    PMD_SKITTY = "pmd-skitty"
+
+
+PMD_SPRITE_THEMES: tuple[WidgetTheme, ...] = (
+    WidgetTheme.PMD_BULBASAUR,
+    WidgetTheme.PMD_CHARMANDER,
+    WidgetTheme.PMD_SQUIRTLE,
+    WidgetTheme.PMD_PIKACHU,
+    WidgetTheme.PMD_JIGGLYPUFF,
+    WidgetTheme.PMD_MEOWTH,
+    WidgetTheme.PMD_MACHOP,
+    WidgetTheme.PMD_EEVEE,
+    WidgetTheme.PMD_CHIKORITA,
+    WidgetTheme.PMD_CYNDAQUIL,
+    WidgetTheme.PMD_TOTODILE,
+    WidgetTheme.PMD_PICHU,
+    WidgetTheme.PMD_UMBREON,
+    WidgetTheme.PMD_MURKROW,
+    WidgetTheme.PMD_SNEASEL,
+    WidgetTheme.PMD_TREECKO,
+    WidgetTheme.PMD_TORCHIC,
+    WidgetTheme.PMD_MUDKIP,
+    WidgetTheme.PMD_RALTS,
+    WidgetTheme.PMD_SKITTY,
+)
 
 
 @dataclass(slots=True)
@@ -32,6 +76,21 @@ class ThemeManifest:
     name: str
     sprites: dict[WidgetMood, Path]
     audio: dict[str, Path]
+
+
+@dataclass(slots=True, frozen=True)
+class ThemeRegistryEntry:
+    theme: str
+    display_name: str
+    manifest: Path | None
+    source: str
+    license: str | None = None
+
+
+@dataclass(slots=True)
+class ThemeRegistry:
+    default_theme: str
+    themes: list[ThemeRegistryEntry]
 
 
 def default_theme() -> WidgetTheme:
@@ -60,6 +119,17 @@ def default_assets_root() -> Path:
 
 def default_theme_manifest_path(assets_root: Path | None = None) -> Path:
     return (assets_root or default_assets_root()) / "theme-manifest.json"
+
+
+def default_theme_registry_path(assets_root: Path | None = None) -> Path:
+    return (assets_root or default_assets_root()) / "theme-registry.json"
+
+
+def theme_manifest_path(theme: WidgetTheme, assets_root: Path | None = None) -> Path:
+    root = assets_root or default_assets_root()
+    if theme is WidgetTheme.COMPANY_PET:
+        return default_theme_manifest_path(root)
+    return root / theme.value / "theme-manifest.json"
 
 
 def is_image_sprite(path: Path) -> bool:
@@ -92,6 +162,35 @@ def load_theme_manifest(path: Path) -> ThemeManifest:
     }
     audio = {key: _manifest_asset_path(value) for key, value in raw.get("audio", {}).items()}
     return ThemeManifest(name=raw["theme"], sprites=sprites, audio=audio)
+
+
+def load_manifest_for_theme(
+    theme: WidgetTheme,
+    *,
+    assets_root: Path | None = None,
+) -> ThemeManifest:
+    if theme is WidgetTheme.CLASSIC:
+        return classic_theme_manifest()
+    return load_theme_manifest(theme_manifest_path(theme, assets_root))
+
+
+def load_theme_registry(path: Path) -> ThemeRegistry:
+    raw = json.loads(path.read_text("utf-8"))
+    entries = [
+        ThemeRegistryEntry(
+            theme=entry["theme"],
+            display_name=entry["display_name"],
+            manifest=(
+                None
+                if entry.get("manifest") is None
+                else _manifest_asset_path(entry["manifest"])
+            ),
+            source=entry["source"],
+            license=entry.get("license"),
+        )
+        for entry in raw["themes"]
+    ]
+    return ThemeRegistry(default_theme=raw["default_theme"], themes=entries)
 
 
 def validate_theme_assets(manifest: ThemeManifest, assets_root: Path) -> list[Path]:

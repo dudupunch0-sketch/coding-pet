@@ -116,6 +116,8 @@ def test_admin_doctor_reports_path_and_runtime_health(
     assert "assets_root=" in result.stdout
     assert "theme=company-pet" in result.stdout
     assert "theme_missing_assets=none" in result.stdout
+    assert "theme_registry_count=22" in result.stdout
+    assert "theme_spritecollab_count=20" in result.stdout
 
 
 def test_admin_doctor_prints_live_configuration(

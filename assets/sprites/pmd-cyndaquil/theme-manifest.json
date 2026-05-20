@@ -1,0 +1,13 @@
+{
+  "theme": "pmd-cyndaquil",
+  "sprites": {
+    "idle": "pmd-cyndaquil/idle.png",
+    "typing": "pmd-cyndaquil/typing.png",
+    "celebrate": "pmd-cyndaquil/celebrate.png",
+    "alert": "pmd-cyndaquil/alert.png",
+    "thinking": "pmd-cyndaquil/thinking.png",
+    "sleepy": "pmd-cyndaquil/sleepy.png",
+    "sad": "pmd-cyndaquil/sad.png"
+  },
+  "audio": {}
+}

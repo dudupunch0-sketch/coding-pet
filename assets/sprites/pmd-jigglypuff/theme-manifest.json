@@ -1,0 +1,13 @@
+{
+  "theme": "pmd-jigglypuff",
+  "sprites": {
+    "idle": "pmd-jigglypuff/idle.png",
+    "typing": "pmd-jigglypuff/typing.png",
+    "celebrate": "pmd-jigglypuff/celebrate.png",
+    "alert": "pmd-jigglypuff/alert.png",
+    "thinking": "pmd-jigglypuff/thinking.png",
+    "sleepy": "pmd-jigglypuff/sleepy.png",
+    "sad": "pmd-jigglypuff/sad.png"
+  },
+  "audio": {}
+}

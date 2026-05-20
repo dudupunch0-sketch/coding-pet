@@ -107,7 +107,7 @@ Responsibilities:
 - render transient success/failure action feedback without overwriting the real session summary
 - treat restored snapshot sessions as read-only in the panel
 - on detail-popup open, request the latest transcript snapshot and send `mark_read`; later `transcript_snapshot` and `transcript_appended` messages update the popup model
-- discover the default `company-pet` PNG theme from source assets, `CODING_PET_ASSETS_DIR`, or installed `share/coding-pet/assets`
+- discover the default `company-pet` PNG theme and the registered PMD SpriteCollab sample character themes from source assets, `CODING_PET_ASSETS_DIR`, or installed `share/coding-pet/assets`
 - keep the classic text theme available as an explicit fallback
 
 Current implementation notes:
@@ -185,6 +185,6 @@ Default paths:
 - the PySide6 environment on this host is still unavailable for real manual GUI runs, so some UX work remains test-driven only
 - full PySide6 detail-popup send/attach button wiring still needs target-host validation; the daemon action handlers and headless request builders are covered by tests
 - this server still uses constrained degraded-mode operation for Claude Code/OpenCode because those binaries are not installed locally
-- default sprite/theme assets are original internal pilot art, not third-party character art; final company brand art can replace them through a new complete theme
+- default sprite/theme assets are original internal pilot art, not third-party character art; PMD SpriteCollab sample character themes are bundled separately for non-commercial selectable-character testing, and final company brand art can replace them through new complete themes
 - transcript capture is a bounded tmux screen-diff log; robust redaction and perfect TTY replay are future work
 - company-server GUI/backend behavior still needs validation on the actual target environment

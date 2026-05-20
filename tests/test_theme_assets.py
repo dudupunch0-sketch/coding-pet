@@ -9,12 +9,17 @@ import pytest
 
 import coding_pet.gui.theme as theme_module
 from coding_pet.gui.theme import (
+    PMD_SPRITE_THEMES,
     WidgetMood,
     WidgetTheme,
     default_assets_root,
+    default_theme,
     default_theme_manifest_path,
+    default_theme_registry_path,
     is_image_sprite,
+    load_manifest_for_theme,
     load_theme_manifest,
+    load_theme_registry,
     resolve_sprite_for_mood,
     validate_theme_assets,
 )
@@ -39,8 +44,34 @@ def test_theme_manifest_loads_company_safe_png_theme() -> None:
     manifest = load_theme_manifest(default_theme_manifest_path(assets_root))
 
     assert manifest.name == WidgetTheme.COMPANY_PET.value
+    assert default_theme().value == manifest.name
     assert manifest.sprites[WidgetMood.ALERT].as_posix().endswith("company-pet/alert.png")
     assert is_image_sprite(manifest.sprites[WidgetMood.ALERT]) is True
+
+
+def test_theme_registry_includes_twenty_spritecollab_character_choices() -> None:
+    assets_root = default_assets_root()
+    registry = load_theme_registry(default_theme_registry_path(assets_root))
+    pmd_entries = [entry for entry in registry.themes if entry.theme.startswith("pmd-")]
+
+    assert registry.default_theme == WidgetTheme.COMPANY_PET.value
+    assert len(pmd_entries) == 20
+    assert {entry.theme for entry in pmd_entries} == {theme.value for theme in PMD_SPRITE_THEMES}
+    assert all(WidgetTheme(entry.theme) in PMD_SPRITE_THEMES for entry in pmd_entries)
+    assert all(entry.license == "CC BY-NC 4.0" for entry in pmd_entries)
+
+
+@pytest.mark.parametrize("widget_theme", PMD_SPRITE_THEMES)
+def test_spritecollab_character_theme_assets_exist_for_all_moods(
+    widget_theme: WidgetTheme,
+) -> None:
+    assets_root = default_assets_root()
+    manifest = load_manifest_for_theme(widget_theme, assets_root=assets_root)
+
+    assert manifest.name == widget_theme.value
+    assert set(manifest.sprites) == set(WidgetMood)
+    assert all(is_image_sprite(sprite) for sprite in manifest.sprites.values())
+    assert validate_theme_assets(manifest, assets_root) == []
 
 
 def test_theme_manifest_rejects_paths_outside_assets_root(tmp_path: Path) -> None:
@@ -65,6 +96,7 @@ def test_default_assets_root_resolves_checked_in_manifest() -> None:
 
     assert assets_root.is_absolute()
     assert default_theme_manifest_path(assets_root).exists()
+    assert default_theme_registry_path(assets_root).exists()
 
 
 def test_default_assets_root_checks_userbase_shared_data(
@@ -92,7 +124,7 @@ def test_default_assets_root_checks_userbase_shared_data(
     assert default_assets_root() == userbase_assets
 
 
-def test_required_mood_assets_exist_for_all_production_states() -> None:
+def test_required_mood_assets_exist_for_default_production_theme() -> None:
     assets_root = default_assets_root()
     manifest = load_theme_manifest(default_theme_manifest_path(assets_root))
 
@@ -122,7 +154,7 @@ def test_packaging_includes_sprite_assets_for_installed_runtime() -> None:
     assert hatch["wheel"]["shared-data"]["assets"] == "share/coding-pet/assets"
 
 
-def test_widget_shell_resolves_png_sprite_without_qt_runtime() -> None:
+def test_widget_shell_resolves_company_png_sprite_without_qt_runtime() -> None:
     shell = CodingPetWidgetShell(
         status=build_status("needs-input", AttentionState.NEEDS_INPUT),
         theme=WidgetTheme.COMPANY_PET,
@@ -132,7 +164,21 @@ def test_widget_shell_resolves_png_sprite_without_qt_runtime() -> None:
 
     assert sprite is not None
     assert sprite.is_absolute()
-    assert sprite.name == "alert.png"
+    assert sprite.parts[-2:] == ("company-pet", "alert.png")
+    assert is_image_sprite(sprite) is True
+
+
+def test_widget_shell_resolves_selected_spritecollab_character_without_qt_runtime() -> None:
+    shell = CodingPetWidgetShell(
+        status=build_status("thinking", AttentionState.NEEDS_CHOICE),
+        theme=WidgetTheme.PMD_PIKACHU,
+    )
+
+    sprite = shell.sprite_asset_path("thinking")
+
+    assert sprite is not None
+    assert sprite.is_absolute()
+    assert sprite.parts[-2:] == ("pmd-pikachu", "thinking.png")
     assert is_image_sprite(sprite) is True
 
 

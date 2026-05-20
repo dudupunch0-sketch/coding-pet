@@ -1,0 +1,13 @@
+{
+  "theme": "pmd-skitty",
+  "sprites": {
+    "idle": "pmd-skitty/idle.png",
+    "typing": "pmd-skitty/typing.png",
+    "celebrate": "pmd-skitty/celebrate.png",
+    "alert": "pmd-skitty/alert.png",
+    "thinking": "pmd-skitty/thinking.png",
+    "sleepy": "pmd-skitty/sleepy.png",
+    "sad": "pmd-skitty/sad.png"
+  },
+  "audio": {}
+}

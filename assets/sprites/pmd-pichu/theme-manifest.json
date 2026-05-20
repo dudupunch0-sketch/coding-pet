@@ -1,0 +1,13 @@
+{
+  "theme": "pmd-pichu",
+  "sprites": {
+    "idle": "pmd-pichu/idle.png",
+    "typing": "pmd-pichu/typing.png",
+    "celebrate": "pmd-pichu/celebrate.png",
+    "alert": "pmd-pichu/alert.png",
+    "thinking": "pmd-pichu/thinking.png",
+    "sleepy": "pmd-pichu/sleepy.png",
+    "sad": "pmd-pichu/sad.png"
+  },
+  "audio": {}
+}

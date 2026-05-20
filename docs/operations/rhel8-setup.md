@@ -92,6 +92,8 @@ Expected current-server signals include:
 - `gui_runtime=unavailable` or `gui_runtime=unavailable:no_display` in headless/minimal environments
 - `theme=company-pet`
 - `theme_missing_assets=none`
+- `theme_registry_count=22`
+- `theme_spritecollab_count=20`
 
 Daemon startup smoke check:
 ```bash
@@ -271,6 +273,6 @@ This avoids importing an older editable install from a different checkout.
 - the GUI shell still depends on a full PySide6/Qt runtime, which is unavailable in the current headless test environment
 - full PySide6 detail-popup send/attach button wiring still needs target-host validation; the daemon tmux action path and headless request builders are covered by automated tests
 - restored snapshot sessions are intentionally read-only until a live daemon connection replaces them with active sessions
-- default assets are internal pilot art; replace them with an approved company theme if the target deployment requires brand-specific art
+- default assets are internal pilot art; optional `pmd-*` PMD SpriteCollab sample themes are CC BY-NC 4.0 and for non-commercial selectable-character testing only; replace them with approved company art if the target deployment requires brand-specific assets
 - transcript capture is a bounded tmux screen-diff log and does not yet provide robust secret redaction or perfect terminal replay
 - target-server systemd, GUI, notification, and backend behavior must be validated on the actual company server

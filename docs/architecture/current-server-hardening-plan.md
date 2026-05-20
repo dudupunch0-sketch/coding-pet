@@ -30,7 +30,7 @@ Completed hardening:
 - SQLite transcripts, IPC transcript snapshots, and `transcript_appended` broadcasts support detail-popup transcript refresh.
 - Backend-less tests cover unavailable backends, degraded action handling, restored/read-only sessions, and widget feedback behavior.
 - Docs and smoke checks explicitly describe the constrained-server behavior.
-- Company-safe PNG sprite assets are the default theme, with classic text sprites retained as fallback.
+- Company-safe PNG sprite assets are the default theme, classic text sprites are retained as fallback, and PMD SpriteCollab sample character themes are registered as optional non-commercial choices.
 - Source-checkout systemd units can be configured through `~/.config/coding-pet/service.env` instead of hardcoding one checkout path.
 
 ## Verified Current-Server Checks
@@ -57,7 +57,7 @@ systemd-analyze verify \
 - `ruff`: all checks passed
 - `mypy`: no issues found in 80 source files
 - `compileall`: passed
-- `pip wheel`: passed; wheel includes seven `company-pet` PNGs, the theme manifest, and systemd shared-data files under `share/coding-pet/`
+- `pip wheel`: passed; wheel includes `company-pet` PNGs, classic fallback assets, 20 PMD SpriteCollab sample themes, the theme manifest/registry, and systemd shared-data files under `share/coding-pet/`
 - `systemd-analyze verify`: passed
 
 Runtime smoke checks:
@@ -111,7 +111,7 @@ The constrained-server track is considered complete when:
 - Unavailable, unsupported, read-only, and dead-session flows produce deterministic failure reasons.
 - Backend-less tests cover degraded cases and pass without real backend binaries.
 - Current-server smoke checks pass without installing Claude Code or OpenCode.
-- Default sprite assets are company-safe, complete for all production moods, and diagnosable through `admin doctor`.
+- Default sprite assets are company-safe, PMD sample assets preserve non-commercial attribution, all registered production moods are complete, and the active theme is diagnosable through `admin doctor`.
 - Remaining backend-rich work is explicitly deferred to the future server plan.
 
 All of these criteria are met as of the verification above.

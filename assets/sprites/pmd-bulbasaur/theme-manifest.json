@@ -1,0 +1,13 @@
+{
+  "theme": "pmd-bulbasaur",
+  "sprites": {
+    "idle": "pmd-bulbasaur/idle.png",
+    "typing": "pmd-bulbasaur/typing.png",
+    "celebrate": "pmd-bulbasaur/celebrate.png",
+    "alert": "pmd-bulbasaur/alert.png",
+    "thinking": "pmd-bulbasaur/thinking.png",
+    "sleepy": "pmd-bulbasaur/sleepy.png",
+    "sad": "pmd-bulbasaur/sad.png"
+  },
+  "audio": {}
+}
