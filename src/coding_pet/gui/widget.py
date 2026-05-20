@@ -6,9 +6,16 @@ from pathlib import Path
 from typing import Any
 
 from coding_pet.gui.bubble import bubble_text_for_status
+from coding_pet.gui.runtime import has_graphical_session
 from coding_pet.gui.session_panel import PanelAction, SessionPanelViewModel
 from coding_pet.gui.theme import (
+    ThemeManifest,
+    WidgetMood,
     WidgetTheme,
+    classic_theme_manifest,
+    default_assets_root,
+    default_theme_manifest_path,
+    is_image_sprite,
     load_theme_manifest,
     mood_for_status,
     resolve_sprite_for_mood,
@@ -35,6 +42,8 @@ class CodingPetWidgetShell:
         self.status = status
         self._on_detail_opened = on_detail_opened
         self.panel = SessionPanelViewModel()
+        self.assets_root = default_assets_root()
+        self._theme_manifest = self._load_theme_manifest()
         self.x = 0
         self.y = 0
         self._feedback_text: str | None = None
@@ -58,7 +67,7 @@ class CodingPetWidgetShell:
             self._feedback_text = None
         presentation = self.presentation()
         if self._pet_label is not None:
-            self._pet_label.setText(self._pet_glyph(presentation.mood))
+            self._set_pet_sprite(presentation.mood)
         if self._bubble_label is not None:
             self._bubble_label.setText(presentation.bubble_text)
         if self._widget is not None:
@@ -116,11 +125,21 @@ class CodingPetWidgetShell:
             "reply_text": shortcut,
         }
 
-    def _setup_qt_widget(self) -> None:
+    def _load_theme_manifest(self) -> ThemeManifest | None:
+        if self.theme is WidgetTheme.CLASSIC:
+            return classic_theme_manifest()
         try:
-            from PySide6.QtCore import Qt  # type: ignore[import-not-found]
-            from PySide6.QtGui import QFont  # type: ignore[import-not-found]
-            from PySide6.QtWidgets import (  # type: ignore[import-not-found]
+            return load_theme_manifest(default_theme_manifest_path(self.assets_root))
+        except Exception:
+            return None
+
+    def _setup_qt_widget(self) -> None:
+        if not has_graphical_session():
+            return
+        try:
+            from PySide6.QtCore import Qt
+            from PySide6.QtGui import QFont
+            from PySide6.QtWidgets import (
                 QLabel,
                 QVBoxLayout,
                 QWidget,
@@ -180,15 +199,54 @@ class CodingPetWidgetShell:
         self._pet_label = pet_label
         self._bubble_label = bubble_label
 
-    def _pet_glyph(self, mood: str) -> str:
-        manifest = load_theme_manifest(Path("assets/sprites/theme-manifest.json"))
+    def sprite_asset_path(self, mood: str) -> Path | None:
+        if self._theme_manifest is None:
+            return None
+        try:
+            sprite_mood = WidgetMood(mood)
+        except ValueError:
+            return None
         sprite_path = resolve_sprite_for_mood(
-            manifest,
-            mood=type(next(iter(manifest.sprites.keys())))(mood),
-            assets_root=Path("assets/sprites"),
+            self._theme_manifest,
+            mood=sprite_mood,
+            assets_root=self.assets_root,
         )
-        asset_file = Path("assets/sprites") / sprite_path
+        asset_file = self.assets_root / sprite_path
         if asset_file.exists():
+            return asset_file.resolve()
+        return None
+
+    def _set_pet_sprite(self, mood: str) -> None:
+        asset_file = self.sprite_asset_path(mood)
+        if asset_file is not None and is_image_sprite(asset_file):
+            if self._set_pet_pixmap(asset_file):
+                return
+        if self._pet_label is not None:
+            self._pet_label.setText(self._pet_glyph(mood, asset_file))
+
+    def _set_pet_pixmap(self, asset_file: Path) -> bool:
+        if self._pet_label is None:
+            return False
+        try:
+            from PySide6.QtCore import Qt
+            from PySide6.QtGui import QPixmap
+        except ImportError:
+            return False
+        pixmap = QPixmap(str(asset_file))
+        if pixmap.isNull():
+            return False
+        scaled = pixmap.scaled(
+            96,
+            96,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.FastTransformation,
+        )
+        self._pet_label.setText("")
+        self._pet_label.setPixmap(scaled)
+        return True
+
+    def _pet_glyph(self, mood: str, asset_file: Path | None = None) -> str:
+        if asset_file is not None and not is_image_sprite(asset_file):
             return asset_file.read_text("utf-8").strip()
         return {
             "idle": "(=^･ω･^=)",

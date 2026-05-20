@@ -1,13 +1,13 @@
 {
-  "theme": "classic",
+  "theme": "company-pet",
   "sprites": {
-    "idle": "classic/idle.txt",
-    "typing": "classic/typing.txt",
-    "celebrate": "classic/celebrate.txt",
-    "alert": "classic/alert.txt",
-    "thinking": "classic/thinking.txt",
-    "sleepy": "classic/sleepy.txt",
-    "sad": "classic/sad.txt"
+    "idle": "company-pet/idle.png",
+    "typing": "company-pet/typing.png",
+    "celebrate": "company-pet/celebrate.png",
+    "alert": "company-pet/alert.png",
+    "thinking": "company-pet/thinking.png",
+    "sleepy": "company-pet/sleepy.png",
+    "sad": "company-pet/sad.png"
   },
   "audio": {
     "alert": "classic/alert.txt",

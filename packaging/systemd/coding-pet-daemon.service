@@ -5,11 +5,11 @@ PartOf=coding-pet.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/company/coding-pet
 Environment=PYTHONUNBUFFERED=1
-Environment=PYTHONPATH=%h/company/coding-pet/src
-Environment=XDG_RUNTIME_DIR=%t
-ExecStart=/usr/bin/env python scripts/run_daemon.py
+Environment=CODING_PET_REPO=%h/company/coding-pet/coding-pet
+Environment=CODING_PET_PYTHON=%h/company/coding-pet/coding-pet/.venv/bin/python
+EnvironmentFile=-%h/.config/coding-pet/service.env
+ExecStart=/usr/bin/bash -c 'cd "$CODING_PET_REPO" && export PYTHONPATH="$CODING_PET_REPO/src${PYTHONPATH:+:$PYTHONPATH}" && exec "$CODING_PET_PYTHON" -m coding_pet.cli daemon run'
 Restart=on-failure
 RestartSec=5
 

@@ -137,12 +137,13 @@ def load_config() -> AppConfig:
 
     resolved_config_dir = config_dir or (_xdg_dir("XDG_CONFIG_HOME", ".config") / APP_NAME)
     resolved_state_dir = state_dir or (_xdg_dir("XDG_STATE_HOME", ".local/state") / APP_NAME)
-    runtime_root = runtime_dir or _path_from_env("XDG_RUNTIME_DIR") or _default_runtime_root()
-    resolved_runtime_dir = (
-        runtime_root / APP_NAME
-        if runtime_root is not None
-        else resolved_state_dir / "runtime"
-    )
+    runtime_root = _path_from_env("XDG_RUNTIME_DIR") or _default_runtime_root()
+    if runtime_dir is not None:
+        resolved_runtime_dir = runtime_dir
+    elif runtime_root is not None:
+        resolved_runtime_dir = runtime_root / APP_NAME
+    else:
+        resolved_runtime_dir = resolved_state_dir / "runtime"
     resolved_log_dir = log_dir or (resolved_state_dir / "logs")
     resolved_state_file = state_file or (resolved_state_dir / "state.json")
 

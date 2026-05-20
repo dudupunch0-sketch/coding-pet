@@ -91,6 +91,7 @@ Files:
 - `src/coding_pet/gui/widget.py`
 - `src/coding_pet/gui/bubble.py`
 - `src/coding_pet/gui/theme.py`
+- `src/coding_pet/gui/runtime.py`
 - `src/coding_pet/gui/session_panel.py`
 - `src/coding_pet/gui/detail_view_model.py`
 - `src/coding_pet/gui/detail_popup.py`
@@ -106,10 +107,12 @@ Responsibilities:
 - render transient success/failure action feedback without overwriting the real session summary
 - treat restored snapshot sessions as read-only in the panel
 - on detail-popup open, request the latest transcript snapshot and send `mark_read`; later `transcript_snapshot` and `transcript_appended` messages update the popup model
+- discover the default `company-pet` PNG theme from source assets, `CODING_PET_ASSETS_DIR`, or installed `share/coding-pet/assets`
+- keep the classic text theme available as an explicit fallback
 
 Current implementation notes:
-- the shell supports a PySide6-backed UI when runtime libraries are present
-- in headless or incomplete GUI environments, the non-Qt fallback still preserves state/layout logic for tests and command verification
+- the shell supports a PySide6-backed UI when runtime libraries and a Linux graphical display are present
+- in headless, no-display, or incomplete GUI environments, the non-Qt fallback still preserves state/layout logic for tests and command verification
 
 ### 6. Notifications
 Files:
@@ -182,5 +185,6 @@ Default paths:
 - the PySide6 environment on this host is still unavailable for real manual GUI runs, so some UX work remains test-driven only
 - full PySide6 detail-popup send/attach button wiring still needs target-host validation; the daemon action handlers and headless request builders are covered by tests
 - this server still uses constrained degraded-mode operation for Claude Code/OpenCode because those binaries are not installed locally
-- sprite/theme assets are still placeholder quality
+- default sprite/theme assets are original internal pilot art, not third-party character art; final company brand art can replace them through a new complete theme
 - transcript capture is a bounded tmux screen-diff log; robust redaction and perfect TTY replay are future work
+- company-server GUI/backend behavior still needs validation on the actual target environment

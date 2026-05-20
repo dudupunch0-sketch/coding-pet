@@ -1,5 +1,7 @@
 # coding-pet on RHEL 8.10
 
+Last verified locally: 2026-05-20
+
 ## Target assumptions
 
 - Red Hat Enterprise Linux 8.10 or a compatible enterprise desktop/server install
@@ -26,13 +28,13 @@ python -m pip install -e '.[dev]'
 
 ## Important GUI note
 
-In the current CI/container environment used for development, PySide6 imports can fail because system GUI libraries such as `libEGL.so.1` are unavailable. The widget code handles that gracefully for tests, but a real desktop deployment needs the full Qt runtime stack present.
+In the current CI/container environment used for development, PySide6 imports can fail because system GUI libraries such as `libEGL.so.1` are unavailable. Even when imports succeed, Linux still needs `DISPLAY` or `WAYLAND_DISPLAY` for a real widget window. The widget code handles missing GUI support gracefully for tests and smoke checks, but a real desktop deployment needs the full Qt runtime stack and a graphical user session present.
 
 If `scripts/run_widget.py` prints:
 ```text
 PySide6 GUI runtime is unavailable in this environment.
 ```
-then the Python package is installed but the host still lacks GUI runtime support.
+then the Python package is installed but the host still lacks GUI runtime support or a graphical display for the user session.
 
 ## Verified commands
 
@@ -87,7 +89,9 @@ PYTHONPATH=src python -m coding_pet.cli admin doctor
 Expected current-server signals include:
 - `backend_claude_code=unavailable:not installed (missing 'claude')`
 - `backend_opencode=unavailable:not installed (missing 'opencode')`
-- `gui_runtime=unavailable` in headless/minimal environments
+- `gui_runtime=unavailable` or `gui_runtime=unavailable:no_display` in headless/minimal environments
+- `theme=company-pet`
+- `theme_missing_assets=none`
 
 Daemon startup smoke check:
 ```bash
@@ -104,7 +108,7 @@ PYTHONPATH=src python -m coding_pet.cli widget run
 Expected on this server:
 - prints widget runtime/state information
 - reports `live_mode=false` when no daemon socket exists
-- prints `PySide6 GUI runtime is unavailable in this environment.` when the host lacks Qt runtime support
+- prints `PySide6 GUI runtime is unavailable in this environment.` when the host lacks Qt runtime support or a graphical display
 
 Tmux pane discovery help:
 ```bash
@@ -172,12 +176,25 @@ systemd-analyze verify packaging/systemd/coding-pet.target
 
 Install for the current user:
 ```bash
-mkdir -p ~/.config/systemd/user
+mkdir -p ~/.config/coding-pet ~/.config/systemd/user
+cp packaging/systemd/coding-pet.service.env.example ~/.config/coding-pet/service.env
+$EDITOR ~/.config/coding-pet/service.env
 cp packaging/systemd/coding-pet-daemon.service ~/.config/systemd/user/
 cp packaging/systemd/coding-pet-widget.service ~/.config/systemd/user/
 cp packaging/systemd/coding-pet.target ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now coding-pet.target
+```
+
+At minimum, set these values in `~/.config/coding-pet/service.env` for the target checkout:
+```text
+CODING_PET_REPO=/absolute/path/to/coding-pet
+CODING_PET_PYTHON=/absolute/path/to/coding-pet/.venv/bin/python
+```
+
+If starting from a graphical login, import GUI/session variables before `enable --now`:
+```bash
+systemctl --user import-environment DISPLAY WAYLAND_DISPLAY XAUTHORITY DBUS_SESSION_BUS_ADDRESS XDG_RUNTIME_DIR
 ```
 
 The widget unit is ordered after `graphical-session.target`, and both services use `Restart=on-failure`.
@@ -194,9 +211,10 @@ Useful overrides:
 ```bash
 export CODING_PET_CONFIG_DIR=/custom/config
 export CODING_PET_STATE_DIR=/custom/state
-export CODING_PET_RUNTIME_DIR=/custom/runtime
+export CODING_PET_RUNTIME_DIR=/custom/runtime/coding-pet  # final runtime dir
 export CODING_PET_STATE_FILE=/custom/state/state.json
 export CODING_PET_LOG_DIR=/custom/logs
+export CODING_PET_ASSETS_DIR=/custom/assets/sprites
 export CODING_PET_TMUX_ENABLED=1
 export CODING_PET_TMUX_CAPTURE_LINES=200
 export CODING_PET_TMUX_POLL_INTERVAL_MS=1000
@@ -206,6 +224,14 @@ export CODING_PET_TMUX_EXCLUDE_SESSION_PATTERNS=''
 export CODING_PET_TRANSCRIPT_DB=/custom/state/transcripts.sqlite
 export CODING_PET_TRANSCRIPT_ENABLED=1
 export CODING_PET_STALLED_AFTER_SEC=300
+```
+
+## Company server handoff
+
+For target-server bring-up and expected company-specific decisions, use:
+
+```text
+docs/operations/company-server-handoff.md
 ```
 
 ## Troubleshooting
@@ -245,5 +271,6 @@ This avoids importing an older editable install from a different checkout.
 - the GUI shell still depends on a full PySide6/Qt runtime, which is unavailable in the current headless test environment
 - full PySide6 detail-popup send/attach button wiring still needs target-host validation; the daemon tmux action path and headless request builders are covered by automated tests
 - restored snapshot sessions are intentionally read-only until a live daemon connection replaces them with active sessions
-- asset/theme pack is still placeholder quality
+- default assets are internal pilot art; replace them with an approved company theme if the target deployment requires brand-specific art
 - transcript capture is a bounded tmux screen-diff log and does not yet provide robust secret redaction or perfect terminal replay
+- target-server systemd, GUI, notification, and backend behavior must be validated on the actual company server
