@@ -17,6 +17,13 @@ from coding_pet.daemon.manager import MonitorManager
 from coding_pet.daemon.runtime import DaemonRuntime
 from coding_pet.daemon.session_registry import SessionRegistry
 from coding_pet.daemon.tmux_monitor import TmuxMonitorService, session_id_for_pane
+from coding_pet.gui.runtime import gui_runtime_status
+from coding_pet.gui.theme import (
+    default_assets_root,
+    default_theme_manifest_path,
+    load_theme_manifest,
+    validate_theme_assets,
+)
 from coding_pet.models import AgentKind
 from coding_pet.state_store import StateStore
 from coding_pet.tmux.client import TmuxClient, TmuxCommandError
@@ -241,11 +248,7 @@ def _path_health(path: Path) -> str:
 
 
 def _gui_runtime_status() -> str:
-    try:
-        from PySide6.QtWidgets import QApplication  # type: ignore[import-not-found]  # noqa: F401
-    except Exception:
-        return "unavailable"
-    return "available"
+    return gui_runtime_status()
 
 
 @admin_app.command("doctor")
@@ -266,6 +269,22 @@ def admin_doctor() -> None:
     typer.echo(f"transcript_db={config.transcript.db_path}")
     typer.echo(f"transcript_enabled={str(config.transcript.enabled).lower()}")
     typer.echo(f"gui_runtime={_gui_runtime_status()}")
+    assets_root = default_assets_root()
+    typer.echo(f"assets_root={assets_root}")
+    try:
+        manifest = load_theme_manifest(default_theme_manifest_path(assets_root))
+    except Exception as exc:
+        typer.echo("theme=unavailable")
+        typer.echo(f"theme_missing_assets=manifest_error:{exc}")
+    else:
+        missing_assets = validate_theme_assets(manifest, assets_root)
+        missing_summary = (
+            "none"
+            if not missing_assets
+            else ",".join(path.as_posix() for path in missing_assets)
+        )
+        typer.echo(f"theme={manifest.name}")
+        typer.echo(f"theme_missing_assets={missing_summary}")
     runtime_socket = config.runtime_dir / "coding-pet.sock"
     typer.echo(f"runtime_socket_exists={str(runtime_socket.exists()).lower()}")
     typer.echo(f"path_status_config_dir={_path_health(config.config_dir)}")

@@ -1,6 +1,6 @@
 # Current Server Hardening Status
 
-Last verified: 2026-05-19
+Last verified: 2026-05-20
 
 ## Goal
 
@@ -30,6 +30,8 @@ Completed hardening:
 - SQLite transcripts, IPC transcript snapshots, and `transcript_appended` broadcasts support detail-popup transcript refresh.
 - Backend-less tests cover unavailable backends, degraded action handling, restored/read-only sessions, and widget feedback behavior.
 - Docs and smoke checks explicitly describe the constrained-server behavior.
+- Company-safe PNG sprite assets are the default theme, with classic text sprites retained as fallback.
+- Source-checkout systemd units can be configured through `~/.config/coding-pet/service.env` instead of hardcoding one checkout path.
 
 ## Verified Current-Server Checks
 
@@ -42,18 +44,20 @@ PYTHONPATH=src python -m pytest -q
 PYTHONPATH=src python -m ruff check src tests scripts
 PYTHONPATH=src python -m mypy src tests
 PYTHONPATH=src python -m compileall -q src
+python -m pip wheel . --no-deps -w /tmp/coding_pet_wheel
 systemd-analyze verify \
   packaging/systemd/coding-pet-daemon.service \
   packaging/systemd/coding-pet-widget.service \
   packaging/systemd/coding-pet.target
 ```
 
-2026-05-19 result:
+2026-05-20 result:
 
-- `142 passed`
+- `154 passed`
 - `ruff`: all checks passed
-- `mypy`: no issues found in 78 source files
+- `mypy`: no issues found in 80 source files
 - `compileall`: passed
+- `pip wheel`: passed; wheel includes seven `company-pet` PNGs, the theme manifest, and systemd shared-data files under `share/coding-pet/`
 - `systemd-analyze verify`: passed
 
 Runtime smoke checks:
@@ -73,8 +77,10 @@ Expected constrained-server signals:
 
 - `backend_claude_code=unavailable:not installed (missing 'claude')`
 - `backend_opencode=unavailable:not installed (missing 'opencode')`
+- `gui_runtime=unavailable:no_display` on this headless host; `gui_runtime=unavailable` covers missing Qt/PySide6 runtime libraries.
+- `theme=company-pet` and `theme_missing_assets=none`.
 - `daemon run` in oneshot mode prints `coding-pet daemon ready ...` and exits cleanly.
-- `widget run` prints runtime/state information and gracefully reports unavailable GUI runtime when Qt cannot start.
+- `widget run` prints runtime/state information and gracefully reports unavailable GUI runtime when Qt cannot start or no graphical display is present.
 - `discover-tmux` lists current panes and marks non-agent panes as ignored when no matching Claude/OpenCode rules apply.
 - `daemon monitor` exits non-zero before launch with an unavailable-backend diagnostic.
 
@@ -105,6 +111,7 @@ The constrained-server track is considered complete when:
 - Unavailable, unsupported, read-only, and dead-session flows produce deterministic failure reasons.
 - Backend-less tests cover degraded cases and pass without real backend binaries.
 - Current-server smoke checks pass without installing Claude Code or OpenCode.
+- Default sprite assets are company-safe, complete for all production moods, and diagnosable through `admin doctor`.
 - Remaining backend-rich work is explicitly deferred to the future server plan.
 
 All of these criteria are met as of the verification above.

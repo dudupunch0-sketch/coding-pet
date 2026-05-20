@@ -1,4 +1,7 @@
 [Unit]
-Description=Coding Pet user session target
+Description=Coding Pet user services
 Wants=coding-pet-daemon.service coding-pet-widget.service
 After=coding-pet-daemon.service coding-pet-widget.service
+
+[Install]
+WantedBy=default.target

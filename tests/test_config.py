@@ -66,6 +66,18 @@ def test_environment_overrides_win(
     assert config.config_dir == override_dir
 
 
+def test_runtime_dir_environment_override_is_final_directory(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    runtime_dir = tmp_path / "approved-runtime" / "coding-pet"
+    monkeypatch.setenv("CODING_PET_RUNTIME_DIR", str(runtime_dir))
+
+    config = load_config()
+
+    assert config.runtime_dir == runtime_dir
+
+
 def test_app_config_defaults_are_production_safe(tmp_path: Path) -> None:
     config = AppConfig(
         config_dir=tmp_path / "cfg",

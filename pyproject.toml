@@ -33,14 +33,17 @@ include = [
   "/src/coding_pet",
   "/scripts",
   "/packaging/systemd",
+  "/assets",
   "/README.md",
   "/docs",
 ]
 
 [tool.hatch.build.targets.wheel.shared-data]
+"assets" = "share/coding-pet/assets"
 "packaging/systemd/coding-pet-daemon.service" = "share/coding-pet/systemd/coding-pet-daemon.service"
 "packaging/systemd/coding-pet-widget.service" = "share/coding-pet/systemd/coding-pet-widget.service"
 "packaging/systemd/coding-pet.target" = "share/coding-pet/systemd/coding-pet.target"
+"packaging/systemd/coding-pet.service.env.example" = "share/coding-pet/systemd/coding-pet.service.env.example"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
@@ -59,3 +62,7 @@ python_version = "3.11"
 mypy_path = ["src"]
 strict = true
 warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = ["PySide6.*"]
+ignore_missing_imports = true

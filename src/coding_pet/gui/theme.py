@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
+import site
+import sys
+import sysconfig
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -20,6 +24,7 @@ class WidgetMood(StrEnum):
 
 class WidgetTheme(StrEnum):
     CLASSIC = "classic"
+    COMPANY_PET = "company-pet"
 
 
 @dataclass(slots=True)
@@ -30,13 +35,62 @@ class ThemeManifest:
 
 
 def default_theme() -> WidgetTheme:
-    return WidgetTheme.CLASSIC
+    return WidgetTheme.COMPANY_PET
+
+
+def default_assets_root() -> Path:
+    override = os.environ.get("CODING_PET_ASSETS_DIR")
+    if override:
+        return Path(override).expanduser().resolve()
+
+    source_root = Path(__file__).resolve().parents[3] / "assets" / "sprites"
+    if source_root.exists():
+        return source_root
+
+    candidates = [
+        Path(sysconfig.get_path("data")) / "share" / "coding-pet" / "assets" / "sprites",
+        Path(site.getuserbase()) / "share" / "coding-pet" / "assets" / "sprites",
+        Path(sys.prefix) / "share" / "coding-pet" / "assets" / "sprites",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
+
+
+def default_theme_manifest_path(assets_root: Path | None = None) -> Path:
+    return (assets_root or default_assets_root()) / "theme-manifest.json"
+
+
+def is_image_sprite(path: Path) -> bool:
+    return path.suffix.lower() == ".png"
+
+
+def _manifest_asset_path(value: str) -> Path:
+    path = Path(value)
+    if path.is_absolute() or ".." in path.parts:
+        raise ValueError(f"theme asset path must stay within assets root: {value}")
+    return path
+
+
+def classic_theme_manifest() -> ThemeManifest:
+    return ThemeManifest(
+        name=WidgetTheme.CLASSIC.value,
+        sprites={mood: Path(f"classic/{mood.value}.txt") for mood in WidgetMood},
+        audio={
+            "alert": Path("classic/alert.txt"),
+            "celebrate": Path("classic/celebrate.txt"),
+        },
+    )
 
 
 def load_theme_manifest(path: Path) -> ThemeManifest:
     raw = json.loads(path.read_text("utf-8"))
-    sprites = {WidgetMood(key): Path(value) for key, value in raw["sprites"].items()}
-    audio = {key: Path(value) for key, value in raw.get("audio", {}).items()}
+    sprites = {
+        WidgetMood(key): _manifest_asset_path(value)
+        for key, value in raw["sprites"].items()
+    }
+    audio = {key: _manifest_asset_path(value) for key, value in raw.get("audio", {}).items()}
     return ThemeManifest(name=raw["theme"], sprites=sprites, audio=audio)
 
 

@@ -113,6 +113,9 @@ def test_admin_doctor_reports_path_and_runtime_health(
     assert "path_status_config_dir=missing,writable_parent=true" in result.stdout
     assert "path_status_runtime_dir=exists,writable_parent=true" in result.stdout
     assert "gui_runtime=unavailable" in result.stdout.lower()
+    assert "assets_root=" in result.stdout
+    assert "theme=company-pet" in result.stdout
+    assert "theme_missing_assets=none" in result.stdout
 
 
 def test_admin_doctor_prints_live_configuration(

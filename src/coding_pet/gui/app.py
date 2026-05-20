@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from coding_pet.gui.runtime import has_graphical_session
 from coding_pet.gui.session_panel import PanelAction
 from coding_pet.gui.theme import WidgetTheme, default_theme
 from coding_pet.ipc.client import IpcClient
@@ -47,7 +48,9 @@ class CodingPetWidgetApp:
     _ready: asyncio.Event = field(init=False, default_factory=asyncio.Event)
 
     def ensure_app(self) -> Any:
-        from PySide6.QtWidgets import QApplication  # type: ignore[import-not-found]
+        if not has_graphical_session():
+            raise RuntimeError("graphical session is unavailable")
+        from PySide6.QtWidgets import QApplication
 
         app = QApplication.instance()
         if app is None:

@@ -63,7 +63,7 @@ class DetailPopupShell:
         if self._widget is not None:
             return
         try:
-            from PySide6.QtWidgets import (  # type: ignore[import-not-found]
+            from PySide6.QtWidgets import (
                 QLabel,
                 QPlainTextEdit,
                 QPushButton,
