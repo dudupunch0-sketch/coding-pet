@@ -20,7 +20,7 @@ Start this plan only after current-server hardening is complete. Extend `coding-
 - The current tmux path already provides discovery/capture/control, SQLite transcripts, and IPC transcript snapshot/appended-event updates without requiring local Claude Code/OpenCode installs.
 - Backend-less tests pass without requiring Claude Code or OpenCode.
 - Docs clearly separate constrained-server behavior from future backend-capable behavior.
-- Company-server handoff docs, source-checkout systemd units, `company-pet` assets, and wheel shared-data packaging are locally verified.
+- Company-server handoff docs, source-checkout systemd units, `company-pet` assets, optional PMD SpriteCollab sample themes, and wheel shared-data packaging are locally verified.
 - Company-server bring-up has followed `docs/operations/company-server-handoff.md` and recorded whether GUI/backend prerequisites are actually present.
 
 ## Work Moved Here from the Current Server Plan

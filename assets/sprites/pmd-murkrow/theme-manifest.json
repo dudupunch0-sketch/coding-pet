@@ -1,0 +1,13 @@
+{
+  "theme": "pmd-murkrow",
+  "sprites": {
+    "idle": "pmd-murkrow/idle.png",
+    "typing": "pmd-murkrow/typing.png",
+    "celebrate": "pmd-murkrow/celebrate.png",
+    "alert": "pmd-murkrow/alert.png",
+    "thinking": "pmd-murkrow/thinking.png",
+    "sleepy": "pmd-murkrow/sleepy.png",
+    "sad": "pmd-murkrow/sad.png"
+  },
+  "audio": {}
+}

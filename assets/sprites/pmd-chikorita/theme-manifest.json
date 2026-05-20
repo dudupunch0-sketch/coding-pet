@@ -1,0 +1,13 @@
+{
+  "theme": "pmd-chikorita",
+  "sprites": {
+    "idle": "pmd-chikorita/idle.png",
+    "typing": "pmd-chikorita/typing.png",
+    "celebrate": "pmd-chikorita/celebrate.png",
+    "alert": "pmd-chikorita/alert.png",
+    "thinking": "pmd-chikorita/thinking.png",
+    "sleepy": "pmd-chikorita/sleepy.png",
+    "sad": "pmd-chikorita/sad.png"
+  },
+  "audio": {}
+}

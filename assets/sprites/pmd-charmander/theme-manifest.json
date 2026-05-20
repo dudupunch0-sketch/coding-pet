@@ -1,0 +1,13 @@
+{
+  "theme": "pmd-charmander",
+  "sprites": {
+    "idle": "pmd-charmander/idle.png",
+    "typing": "pmd-charmander/typing.png",
+    "celebrate": "pmd-charmander/celebrate.png",
+    "alert": "pmd-charmander/alert.png",
+    "thinking": "pmd-charmander/thinking.png",
+    "sleepy": "pmd-charmander/sleepy.png",
+    "sad": "pmd-charmander/sad.png"
+  },
+  "audio": {}
+}

@@ -1,0 +1,13 @@
+{
+  "theme": "pmd-mudkip",
+  "sprites": {
+    "idle": "pmd-mudkip/idle.png",
+    "typing": "pmd-mudkip/typing.png",
+    "celebrate": "pmd-mudkip/celebrate.png",
+    "alert": "pmd-mudkip/alert.png",
+    "thinking": "pmd-mudkip/thinking.png",
+    "sleepy": "pmd-mudkip/sleepy.png",
+    "sad": "pmd-mudkip/sad.png"
+  },
+  "audio": {}
+}

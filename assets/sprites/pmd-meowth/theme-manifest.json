@@ -1,0 +1,13 @@
+{
+  "theme": "pmd-meowth",
+  "sprites": {
+    "idle": "pmd-meowth/idle.png",
+    "typing": "pmd-meowth/typing.png",
+    "celebrate": "pmd-meowth/celebrate.png",
+    "alert": "pmd-meowth/alert.png",
+    "thinking": "pmd-meowth/thinking.png",
+    "sleepy": "pmd-meowth/sleepy.png",
+    "sad": "pmd-meowth/sad.png"
+  },
+  "audio": {}
+}

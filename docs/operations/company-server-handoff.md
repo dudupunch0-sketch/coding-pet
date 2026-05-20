@@ -21,6 +21,7 @@ Locally verified scope:
 - Systemd user unit syntax.
 - Company-safe default PNG sprite theme under `assets/sprites/company-pet/`.
 - Fallback classic text sprites under `assets/sprites/classic/`.
+- 20 selectable PMD SpriteCollab sample character themes under `assets/sprites/pmd-*` with preserved CC BY-NC 4.0 attribution.
 - Asset discovery via checked-in source assets, optional `CODING_PET_ASSETS_DIR`, or installed `share/coding-pet/assets`.
 - `admin doctor` reporting config paths, GUI runtime availability, backend availability, and sprite theme health.
 - Full local verification gate: `154 passed`, ruff clean, mypy clean over 80 source files, compileall clean, systemd units verified, wheel build/inspection passed.
@@ -29,7 +30,10 @@ Wheel/package artifact inspection confirmed these installed shared-data paths:
 
 ```text
 share/coding-pet/assets/sprites/theme-manifest.json
+share/coding-pet/assets/sprites/theme-registry.json
 share/coding-pet/assets/sprites/company-pet/*.png
+share/coding-pet/assets/sprites/classic/*.txt
+share/coding-pet/assets/sprites/pmd-*/*.png
 share/coding-pet/systemd/coding-pet.service.env.example
 share/coding-pet/systemd/coding-pet-daemon.service
 share/coding-pet/systemd/coding-pet-widget.service
@@ -49,7 +53,10 @@ packaging/systemd/coding-pet-widget.service
 packaging/systemd/coding-pet.target
 packaging/systemd/coding-pet.service.env.example
 assets/sprites/theme-manifest.json
+assets/sprites/theme-registry.json
 assets/sprites/company-pet/*.png
+assets/sprites/classic/*.txt
+assets/sprites/pmd-*/*.png
 ```
 
 ## Target Server Prerequisites
@@ -228,7 +235,7 @@ docs/architecture/future-agent-enabled-server-plan.md
 
 ### 6. Asset Policy
 
-Default assets are original `company-pet` PNGs generated for this repo and documented as internal pilot/demo art with no third-party character art bundled. If the company requires brand art, replace only the files under a new theme directory and update `assets/sprites/theme-manifest.json`; keep all seven production moods complete.
+Default assets are original `company-pet` PNGs generated for this repo and documented as internal pilot/demo art. The `pmd-*` directories are separately registered PMD SpriteCollab sample character themes licensed CC BY-NC 4.0 with per-character `credits.txt`; they are for non-commercial selectable-character testing, not company-owned production art. If the company requires brand art, replace only the files under a new complete theme directory and update the theme manifest/registry deliberately; keep all seven production moods complete.
 
 Required moods:
 

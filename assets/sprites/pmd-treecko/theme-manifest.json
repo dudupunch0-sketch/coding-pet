@@ -1,0 +1,13 @@
+{
+  "theme": "pmd-treecko",
+  "sprites": {
+    "idle": "pmd-treecko/idle.png",
+    "typing": "pmd-treecko/typing.png",
+    "celebrate": "pmd-treecko/celebrate.png",
+    "alert": "pmd-treecko/alert.png",
+    "thinking": "pmd-treecko/thinking.png",
+    "sleepy": "pmd-treecko/sleepy.png",
+    "sad": "pmd-treecko/sad.png"
+  },
+  "audio": {}
+}

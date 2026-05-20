@@ -12,11 +12,9 @@ from coding_pet.gui.theme import (
     ThemeManifest,
     WidgetMood,
     WidgetTheme,
-    classic_theme_manifest,
     default_assets_root,
-    default_theme_manifest_path,
     is_image_sprite,
-    load_theme_manifest,
+    load_manifest_for_theme,
     mood_for_status,
     resolve_sprite_for_mood,
 )
@@ -126,10 +124,8 @@ class CodingPetWidgetShell:
         }
 
     def _load_theme_manifest(self) -> ThemeManifest | None:
-        if self.theme is WidgetTheme.CLASSIC:
-            return classic_theme_manifest()
         try:
-            return load_theme_manifest(default_theme_manifest_path(self.assets_root))
+            return load_manifest_for_theme(self.theme, assets_root=self.assets_root)
         except Exception:
             return None
 

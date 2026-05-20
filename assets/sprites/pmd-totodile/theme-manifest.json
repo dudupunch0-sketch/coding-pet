@@ -1,0 +1,13 @@
+{
+  "theme": "pmd-totodile",
+  "sprites": {
+    "idle": "pmd-totodile/idle.png",
+    "typing": "pmd-totodile/typing.png",
+    "celebrate": "pmd-totodile/celebrate.png",
+    "alert": "pmd-totodile/alert.png",
+    "thinking": "pmd-totodile/thinking.png",
+    "sleepy": "pmd-totodile/sleepy.png",
+    "sad": "pmd-totodile/sad.png"
+  },
+  "audio": {}
+}

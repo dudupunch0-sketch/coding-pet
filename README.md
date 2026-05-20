@@ -25,7 +25,7 @@ Implemented today:
 - widget shell, panel view model, and snapshot boot support
 - JSON state persistence for restart resilience
 - packaged systemd user-service unit files
-- company-safe default PNG sprite theme plus retained classic text fallback assets
+- company-safe default PNG sprite theme, retained classic text fallback assets, and 20 selectable PMD SpriteCollab sample character themes
 - `daemon run`, `widget run`, and `admin doctor` CLI runtime commands
 - daemon-owned live action routing for `send_reply`, `approve`, and `reject`
 - tmux pane discovery/capture/control modules for already-running Claude Code/OpenCode sessions
@@ -41,6 +41,7 @@ Still in progress:
 - validating agent-specific control semantics against real Claude Code/OpenCode behavior
 - richer manual GUI UX polish in a full PySide6 environment
 - company-specific deployment validation on the target server
+- custom/licensed production art beyond the bundled PMD SpriteCollab sample character set
 
 ## Packaging and user services
 
@@ -97,12 +98,15 @@ mypy: no issues found in 80 source files
 compileall: passed
 systemd-analyze verify: passed
 pip wheel: passed
-wheel contents: seven company-pet PNGs, theme manifest, and systemd shared-data files present
+wheel contents: company-pet PNGs, classic text fallback, 20 PMD SpriteCollab sample character themes, theme registry, default manifest, and systemd shared-data files present
 ```
 
 The built wheel installs shared data under `share/coding-pet/`, including:
 - `share/coding-pet/assets/sprites/theme-manifest.json`
 - `share/coding-pet/assets/sprites/company-pet/*.png`
+- `share/coding-pet/assets/sprites/classic/*.txt`
+- `share/coding-pet/assets/sprites/pmd-*/*.png`
+- `share/coding-pet/assets/sprites/theme-registry.json`
 - `share/coding-pet/systemd/coding-pet.service.env.example`
 - `share/coding-pet/systemd/coding-pet-daemon.service`
 - `share/coding-pet/systemd/coding-pet-widget.service`
@@ -163,6 +167,8 @@ Expected current-server signals include:
 - `gui_runtime=unavailable` or `gui_runtime=unavailable:no_display` in headless/minimal environments
 - `theme=company-pet`
 - `theme_missing_assets=none`
+- `theme_registry_count=22`
+- `theme_spritecollab_count=20`
 
 Daemon startup smoke check:
 ```bash
@@ -259,7 +265,7 @@ Smoke-test/dev toggle:
 - Future backend-capable track: `docs/architecture/future-agent-enabled-server-plan.md`
 - Operations: `docs/operations/rhel8-setup.md`
 - Company server handoff: `docs/operations/company-server-handoff.md`
-- Default asset policy: `assets/sprites/company-pet/README.md`
+- Default asset policy: `assets/sprites/company-pet/README.md`, `assets/sprites/theme-registry.json`, and `assets/sprites/PMDCOLLAB_LICENSE.md`
 
 ## Current limitations
 

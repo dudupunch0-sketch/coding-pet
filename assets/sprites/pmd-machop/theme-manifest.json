@@ -1,0 +1,13 @@
+{
+  "theme": "pmd-machop",
+  "sprites": {
+    "idle": "pmd-machop/idle.png",
+    "typing": "pmd-machop/typing.png",
+    "celebrate": "pmd-machop/celebrate.png",
+    "alert": "pmd-machop/alert.png",
+    "thinking": "pmd-machop/thinking.png",
+    "sleepy": "pmd-machop/sleepy.png",
+    "sad": "pmd-machop/sad.png"
+  },
+  "audio": {}
+}

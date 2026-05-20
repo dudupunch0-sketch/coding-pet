@@ -9,8 +9,5 @@
     "sleepy": "company-pet/sleepy.png",
     "sad": "company-pet/sad.png"
   },
-  "audio": {
-    "alert": "classic/alert.txt",
-    "celebrate": "classic/celebrate.txt"
-  }
+  "audio": {}
 }

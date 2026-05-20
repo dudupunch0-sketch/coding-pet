@@ -1,0 +1,13 @@
+{
+  "theme": "pmd-torchic",
+  "sprites": {
+    "idle": "pmd-torchic/idle.png",
+    "typing": "pmd-torchic/typing.png",
+    "celebrate": "pmd-torchic/celebrate.png",
+    "alert": "pmd-torchic/alert.png",
+    "thinking": "pmd-torchic/thinking.png",
+    "sleepy": "pmd-torchic/sleepy.png",
+    "sad": "pmd-torchic/sad.png"
+  },
+  "audio": {}
+}

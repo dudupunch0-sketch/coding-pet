@@ -1,0 +1,197 @@
+{
+  "default_theme": "company-pet",
+  "themes": [
+    {
+      "theme": "company-pet",
+      "display_name": "Company Pet",
+      "manifest": "theme-manifest.json",
+      "source": "internal-pilot-art"
+    },
+    {
+      "theme": "classic",
+      "display_name": "Classic Text",
+      "manifest": null,
+      "source": "bundled-text-fallback"
+    },
+    {
+      "theme": "pmd-bulbasaur",
+      "display_name": "Bulbasaur",
+      "manifest": "pmd-bulbasaur/theme-manifest.json",
+      "pokedex_id": "0001",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0001/",
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "theme": "pmd-charmander",
+      "display_name": "Charmander",
+      "manifest": "pmd-charmander/theme-manifest.json",
+      "pokedex_id": "0004",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0004/",
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "theme": "pmd-squirtle",
+      "display_name": "Squirtle",
+      "manifest": "pmd-squirtle/theme-manifest.json",
+      "pokedex_id": "0007",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0007/",
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "theme": "pmd-pikachu",
+      "display_name": "Pikachu",
+      "manifest": "pmd-pikachu/theme-manifest.json",
+      "pokedex_id": "0025",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0025/",
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "theme": "pmd-jigglypuff",
+      "display_name": "Jigglypuff",
+      "manifest": "pmd-jigglypuff/theme-manifest.json",
+      "pokedex_id": "0039",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0039/",
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "theme": "pmd-meowth",
+      "display_name": "Meowth",
+      "manifest": "pmd-meowth/theme-manifest.json",
+      "pokedex_id": "0052",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0052/",
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "theme": "pmd-machop",
+      "display_name": "Machop",
+      "manifest": "pmd-machop/theme-manifest.json",
+      "pokedex_id": "0066",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0066/",
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "theme": "pmd-eevee",
+      "display_name": "Eevee",
+      "manifest": "pmd-eevee/theme-manifest.json",
+      "pokedex_id": "0133",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0133/",
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "theme": "pmd-chikorita",
+      "display_name": "Chikorita",
+      "manifest": "pmd-chikorita/theme-manifest.json",
+      "pokedex_id": "0152",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0152/",
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "theme": "pmd-cyndaquil",
+      "display_name": "Cyndaquil",
+      "manifest": "pmd-cyndaquil/theme-manifest.json",
+      "pokedex_id": "0155",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0155/",
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "theme": "pmd-totodile",
+      "display_name": "Totodile",
+      "manifest": "pmd-totodile/theme-manifest.json",
+      "pokedex_id": "0158",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0158/",
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "theme": "pmd-pichu",
+      "display_name": "Pichu",
+      "manifest": "pmd-pichu/theme-manifest.json",
+      "pokedex_id": "0172",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0172/",
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "theme": "pmd-umbreon",
+      "display_name": "Umbreon",
+      "manifest": "pmd-umbreon/theme-manifest.json",
+      "pokedex_id": "0197",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0197/",
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "theme": "pmd-murkrow",
+      "display_name": "Murkrow",
+      "manifest": "pmd-murkrow/theme-manifest.json",
+      "pokedex_id": "0198",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0198/",
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "theme": "pmd-sneasel",
+      "display_name": "Sneasel",
+      "manifest": "pmd-sneasel/theme-manifest.json",
+      "pokedex_id": "0215",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0215/",
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "theme": "pmd-treecko",
+      "display_name": "Treecko",
+      "manifest": "pmd-treecko/theme-manifest.json",
+      "pokedex_id": "0252",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0252/",
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "theme": "pmd-torchic",
+      "display_name": "Torchic",
+      "manifest": "pmd-torchic/theme-manifest.json",
+      "pokedex_id": "0255",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0255/",
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "theme": "pmd-mudkip",
+      "display_name": "Mudkip",
+      "manifest": "pmd-mudkip/theme-manifest.json",
+      "pokedex_id": "0258",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0258/",
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "theme": "pmd-ralts",
+      "display_name": "Ralts",
+      "manifest": "pmd-ralts/theme-manifest.json",
+      "pokedex_id": "0280",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0280/",
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "theme": "pmd-skitty",
+      "display_name": "Skitty",
+      "manifest": "pmd-skitty/theme-manifest.json",
+      "pokedex_id": "0300",
+      "source": "PMDCollab/SpriteCollab",
+      "source_url": "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0300/",
+      "license": "CC BY-NC 4.0"
+    }
+  ]
+}

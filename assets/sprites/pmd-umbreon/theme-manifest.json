@@ -1,0 +1,13 @@
+{
+  "theme": "pmd-umbreon",
+  "sprites": {
+    "idle": "pmd-umbreon/idle.png",
+    "typing": "pmd-umbreon/typing.png",
+    "celebrate": "pmd-umbreon/celebrate.png",
+    "alert": "pmd-umbreon/alert.png",
+    "thinking": "pmd-umbreon/thinking.png",
+    "sleepy": "pmd-umbreon/sleepy.png",
+    "sad": "pmd-umbreon/sad.png"
+  },
+  "audio": {}
+}

@@ -1,0 +1,13 @@
+{
+  "theme": "pmd-sneasel",
+  "sprites": {
+    "idle": "pmd-sneasel/idle.png",
+    "typing": "pmd-sneasel/typing.png",
+    "celebrate": "pmd-sneasel/celebrate.png",
+    "alert": "pmd-sneasel/alert.png",
+    "thinking": "pmd-sneasel/thinking.png",
+    "sleepy": "pmd-sneasel/sleepy.png",
+    "sad": "pmd-sneasel/sad.png"
+  },
+  "audio": {}
+}
