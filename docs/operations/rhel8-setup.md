@@ -18,6 +18,8 @@ editing and source-control chores, but they are not accepted as target evidence.
 Minimum development/runtime expectations:
 - Python 3.12
 - `pip`
+- root runtime requirements entrypoint `requirements.txt`, which delegates to
+  the RHEL runtime profile under `requirements/`
 - PySide6 Python package constrained to the RHEL 8 compatible wheel range in
   `requirements/constraints-rhel8.txt`
 - Pillow from the runtime wheelhouse for PNG/WebP Codex pet atlas validation

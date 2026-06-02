@@ -242,8 +242,10 @@ def test_packaging_includes_sprite_assets_for_installed_runtime() -> None:
     hatch = pyproject["tool"]["hatch"]["build"]["targets"]
 
     assert "/assets" in hatch["sdist"]["include"]
+    assert "/requirements.txt" in hatch["sdist"]["include"]
     assert hatch["wheel"]["shared-data"]["assets"] == "share/coding-pet/assets"
     assert hatch["wheel"]["shared-data"]["docs"] == "share/coding-pet/docs"
+    assert hatch["wheel"]["shared-data"]["requirements.txt"] == "share/coding-pet/requirements.txt"
     assert hatch["wheel"]["shared-data"]["requirements"] == "share/coding-pet/requirements"
 
 

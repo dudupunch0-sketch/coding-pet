@@ -158,6 +158,7 @@ The built wheel installs shared data under `share/coding-pet/`, including:
 - `share/coding-pet/docs/operations/offline-rhel8-wheelhouse.md`
 - `share/coding-pet/docs/operations/codex-pet-packages.md`
 - `share/coding-pet/docs/operations/llm-target-execution-runbook.md`
+- `share/coding-pet/requirements.txt`
 - `share/coding-pet/requirements/constraints-rhel8.txt`
 - `share/coding-pet/requirements/rhel8-runtime.txt`
 - `share/coding-pet/systemd/coding-pet.service.env.example`

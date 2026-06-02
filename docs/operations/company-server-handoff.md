@@ -85,6 +85,7 @@ share/coding-pet/assets/sprites/pmd-*/*.png
 share/coding-pet/docs/operations/offline-rhel8-wheelhouse.md
 share/coding-pet/docs/operations/codex-pet-packages.md
 share/coding-pet/docs/operations/llm-target-execution-runbook.md
+share/coding-pet/requirements.txt
 share/coding-pet/requirements/constraints-rhel8.txt
 share/coding-pet/requirements/rhel8-runtime.txt
 share/coding-pet/systemd/coding-pet.service.env.example
@@ -105,6 +106,7 @@ packaging/systemd/coding-pet-daemon.service
 packaging/systemd/coding-pet-widget.service
 packaging/systemd/coding-pet.target
 packaging/systemd/coding-pet.service.env.example
+requirements.txt
 requirements/constraints-rhel8.txt
 requirements/rhel8-runtime.txt
 docs/operations/offline-rhel8-wheelhouse.md

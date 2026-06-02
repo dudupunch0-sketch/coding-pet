@@ -52,9 +52,11 @@ def test_operations_docs_and_rhel_constraints_are_packaged_as_shared_data() -> N
     shared_data = pyproject["tool"]["hatch"]["build"]["targets"]["wheel"]["shared-data"]
 
     assert shared_data["docs"] == "share/coding-pet/docs"
+    assert shared_data["requirements.txt"] == "share/coding-pet/requirements.txt"
     assert shared_data["requirements"] == "share/coding-pet/requirements"
     assert (ROOT / "docs" / "operations" / "offline-rhel8-wheelhouse.md").exists()
     assert (ROOT / "docs" / "operations" / "codex-pet-packages.md").exists()
+    assert (ROOT / "requirements.txt").exists()
     assert (ROOT / "requirements" / "constraints-rhel8.txt").exists()
 
 

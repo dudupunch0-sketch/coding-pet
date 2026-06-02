@@ -264,6 +264,7 @@ CODING_PET_REQUIRED_WHEEL_SHARED_DATA = (
     "share/coding-pet/docs/operations/rhel8-setup.md",
     "share/coding-pet/docs/operations/offline-rhel8-wheelhouse.md",
     "share/coding-pet/docs/operations/codex-pet-packages.md",
+    "share/coding-pet/requirements.txt",
     "share/coding-pet/requirements/constraints-rhel8.txt",
     "share/coding-pet/requirements/rhel8-runtime.txt",
     "share/coding-pet/requirements/rhel8-dev.txt",

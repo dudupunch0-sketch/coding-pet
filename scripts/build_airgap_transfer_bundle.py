@@ -15,6 +15,7 @@ INCLUDE_PATHS = (
     ".gitignore",
     "README.md",
     "pyproject.toml",
+    "requirements.txt",
     "assets",
     "docs",
     "packaging",

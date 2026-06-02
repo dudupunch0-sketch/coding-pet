@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_pyproject_and_rhel8_constraints_keep_pyside6_on_manylinux_2_28_range() -> None:
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text("utf-8"))
+    root_requirements = (ROOT / "requirements.txt").read_text("utf-8")
     constraints = (ROOT / "requirements" / "constraints-rhel8.txt").read_text("utf-8")
     runtime = (ROOT / "requirements" / "rhel8-runtime.txt").read_text("utf-8")
     dev = (ROOT / "requirements" / "rhel8-dev.txt").read_text("utf-8")
@@ -22,10 +23,13 @@ def test_pyproject_and_rhel8_constraints_keep_pyside6_on_manylinux_2_28_range() 
     assert pillow_range in constraints
     assert pyside_range in constraints
     assert "PySide6>=6.10" not in constraints
+    assert "-r requirements/rhel8-runtime.txt" in root_requirements
     assert "-c constraints-rhel8.txt" in runtime
     assert "Pillow" in runtime
     assert "PySide6" in runtime
     assert "-r rhel8-runtime.txt" in dev
+    wheel_shared_data = pyproject["tool"]["hatch"]["build"]["targets"]["wheel"]["shared-data"]
+    assert wheel_shared_data["requirements.txt"] == "share/coding-pet/requirements.txt"
 
 
 def test_offline_wheelhouse_docs_target_rhel8_glibc_and_cross_platform_tags() -> None:

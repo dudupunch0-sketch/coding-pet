@@ -75,6 +75,7 @@ REQUIRED_CODING_PET_WHEEL_SUFFIXES = (
     "share/coding-pet/docs/operations/rhel8-setup.md",
     "share/coding-pet/docs/operations/offline-rhel8-wheelhouse.md",
     "share/coding-pet/docs/operations/codex-pet-packages.md",
+    "share/coding-pet/requirements.txt",
     "share/coding-pet/requirements/constraints-rhel8.txt",
     "share/coding-pet/requirements/rhel8-runtime.txt",
     "share/coding-pet/requirements/rhel8-dev.txt",

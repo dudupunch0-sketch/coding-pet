@@ -30,6 +30,7 @@ def test_airgap_transfer_bundle_includes_handoff_files_and_excludes_generated(
     assert len(archive_hash) == 64
     assert paths.archive.exists()
     assert (paths.bundle_root / "README.md").exists()
+    assert (paths.bundle_root / "requirements.txt").exists()
     assert (paths.bundle_root / "docs/operations/llm-target-execution-runbook.md").exists()
     assert (paths.bundle_root / "assets/sprites/codex-default/idle.png").exists()
     assert not (paths.bundle_root / "assets/sprites/company-pet").exists()
@@ -39,6 +40,7 @@ def test_airgap_transfer_bundle_includes_handoff_files_and_excludes_generated(
 
     manifest = paths.manifest.read_text("utf-8")
     assert "docs/operations/llm-target-execution-runbook.md" in manifest
+    assert "requirements.txt" in manifest
     assert "assets/sprites/codex-default/idle.png" in manifest
     assert "assets/sprites/company-pet" not in manifest
 
@@ -46,4 +48,5 @@ def test_airgap_transfer_bundle_includes_handoff_files_and_excludes_generated(
         names = set(archive.getnames())
 
     assert "coding-pet-airgap-transfer/docs/operations/llm-target-execution-runbook.md" in names
+    assert "coding-pet-airgap-transfer/requirements.txt" in names
     assert "coding-pet-airgap-transfer/assets/sprites/codex-default/idle.png" in names

@@ -21,7 +21,7 @@ mkdir -p wheelhouse
 python3.12 -m pip download \
   --only-binary=:all: \
   --dest wheelhouse \
-  -r requirements/rhel8-runtime.txt
+  -r requirements.txt
 cp dist/coding_pet-*.whl wheelhouse/
 ```
 
@@ -37,9 +37,11 @@ python3.12 -m pip download \
   --abi abi3 \
   --abi none \
   --dest wheelhouse \
-  -r requirements/rhel8-runtime.txt
+  -r requirements.txt
 ```
 
+Use `requirements.txt` as the root runtime entrypoint. It delegates to
+`requirements/rhel8-runtime.txt`, which applies `requirements/constraints-rhel8.txt`.
 Use matching Python and ABI tags if the company later changes the runtime.
 The checked-in constraints intentionally cap PySide6 below 6.10 so pip selects
 RHEL 8 compatible `manylinux_2_28` wheels instead of newer `manylinux_2_34`
@@ -66,8 +68,9 @@ wheelhouse 'coding-pet[gui]'` smoke test that imports `PySide6.QtCore`,
 loads the installed `codex-default` theme, and confirms installed systemd unit
 files are discoverable.
 It also opens the `coding_pet-*.whl` archive and verifies that the packaged
-docs, RHEL requirements, systemd units, theme registry, and default pet assets
-are present under `share/coding-pet/`.
+docs, the root runtime `requirements.txt` entrypoint, RHEL requirements,
+systemd units, theme registry, and default pet assets are present under
+`share/coding-pet/`.
 The JSON report records each wheel's filename, normalized distribution name,
 SHA-256, and size in bytes. Required target evidence must include a wheel record
 for each required distribution. Keep that report with the transfer record so

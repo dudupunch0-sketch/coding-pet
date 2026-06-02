@@ -68,6 +68,7 @@ export VENV="$APP_ROOT/.venv"
 ```text
 $APP_ROOT/README.md
 $APP_ROOT/pyproject.toml
+$APP_ROOT/requirements.txt
 $APP_ROOT/src/
 $APP_ROOT/assets/sprites/theme-manifest.json
 $APP_ROOT/assets/sprites/theme-registry.json
@@ -132,12 +133,14 @@ systemctl --user status --no-pager
 cd "$APP_ROOT"
 python3.12 -m venv "$VENV"
 "$VENV/bin/python" -m pip install --upgrade --no-index --find-links "$WHEELHOUSE" pip
+"$VENV/bin/python" -m pip install --no-index --find-links "$WHEELHOUSE" -r requirements.txt
 "$VENV/bin/python" -m pip install --no-index --find-links "$WHEELHOUSE" 'coding-pet[gui]'
 ```
 
 source checkout 기준으로 직접 검증해야 하면 다음을 사용한다.
 
 ```bash
+"$VENV/bin/python" -m pip install --no-index --find-links "$WHEELHOUSE" -r requirements.txt
 "$VENV/bin/python" -m pip install --no-index --find-links "$WHEELHOUSE" -e '.[gui]'
 ```
 

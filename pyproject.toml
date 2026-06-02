@@ -39,6 +39,7 @@ include = [
   "/packaging/systemd",
   "/assets",
   "/README.md",
+  "/requirements.txt",
   "/docs",
   "/requirements",
 ]
@@ -46,6 +47,7 @@ include = [
 [tool.hatch.build.targets.wheel.shared-data]
 "assets" = "share/coding-pet/assets"
 "docs" = "share/coding-pet/docs"
+"requirements.txt" = "share/coding-pet/requirements.txt"
 "requirements" = "share/coding-pet/requirements"
 "packaging/systemd/coding-pet-daemon.service" = "share/coding-pet/systemd/coding-pet-daemon.service"
 "packaging/systemd/coding-pet-widget.service" = "share/coding-pet/systemd/coding-pet-widget.service"
