@@ -43,6 +43,8 @@ def infer_agent_kind(pane: TmuxPaneInfo) -> AgentKind | None:
         for item in (pane.current_command, pane.session_name, pane.title or "")
         if item
     )
+    if "codex" in haystack:
+        return AgentKind.CODEX
     if "opencode" in haystack:
         return AgentKind.OPENCODE
     if "claude" in haystack:

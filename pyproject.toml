@@ -5,18 +5,22 @@ build-backend = "hatchling.build"
 [project]
 name = "coding-pet"
 version = "0.1.0"
-description = "Multi-agent coding pet for monitoring Claude Code and OpenCode sessions on Linux desktops"
+description = "Desktop pet for monitoring local coding-agent CLI sessions on Linux desktops"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12,<3.13"
 dependencies = [
+  "Pillow>=11,<13",
   "pydantic>=2.11,<3",
-  "PySide6>=6.8,<7",
   "typer>=0.16,<1",
 ]
 
 [project.optional-dependencies]
+gui = [
+  "PySide6>=6.8,<6.10",
+]
 dev = [
   "mypy>=1.18,<2",
+  "PySide6>=6.8,<6.10",
   "pytest>=9.0,<10",
   "pytest-asyncio>=1.2,<2",
   "ruff>=0.13,<1",
@@ -36,10 +40,13 @@ include = [
   "/assets",
   "/README.md",
   "/docs",
+  "/requirements",
 ]
 
 [tool.hatch.build.targets.wheel.shared-data]
 "assets" = "share/coding-pet/assets"
+"docs" = "share/coding-pet/docs"
+"requirements" = "share/coding-pet/requirements"
 "packaging/systemd/coding-pet-daemon.service" = "share/coding-pet/systemd/coding-pet-daemon.service"
 "packaging/systemd/coding-pet-widget.service" = "share/coding-pet/systemd/coding-pet-widget.service"
 "packaging/systemd/coding-pet.target" = "share/coding-pet/systemd/coding-pet.target"
@@ -52,17 +59,17 @@ addopts = "-ra"
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 mypy_path = ["src"]
 strict = true
 warn_unused_configs = true
 
 [[tool.mypy.overrides]]
-module = ["PySide6.*"]
+module = ["PIL.*", "PySide6.*"]
 ignore_missing_imports = true

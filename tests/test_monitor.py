@@ -24,6 +24,36 @@ class FakeProcess:
         return self.exit_code
 
 
+class NeverExitingProcess:
+    def __init__(self) -> None:
+        self.terminate_called = False
+
+    def terminate(self) -> None:
+        self.terminate_called = True
+
+    async def wait(self) -> int:
+        await asyncio.Event().wait()
+        return 0
+
+
+class TerminateIgnoringProcess:
+    def __init__(self) -> None:
+        self.terminate_called = False
+        self.kill_called = False
+        self._stopped = asyncio.Event()
+
+    def terminate(self) -> None:
+        self.terminate_called = True
+
+    def kill(self) -> None:
+        self.kill_called = True
+        self._stopped.set()
+
+    async def wait(self) -> int:
+        await self._stopped.wait()
+        return -9
+
+
 async def delayed_lines(*items: tuple[float, str]) -> AsyncIterator[str]:
     for delay, line in items:
         await asyncio.sleep(delay)
@@ -59,7 +89,9 @@ async def test_monitor_manager_tracks_two_sessions_independently() -> None:
     assert claude_status is not None
     assert open_status is not None
     assert claude_status.state is AttentionState.COMPLETED
+    assert claude_status.live is False
     assert open_status.state is AttentionState.NEEDS_PERMISSION
+    assert open_status.live is True
 
     await manager.wait_for_all()
 
@@ -175,3 +207,62 @@ async def test_non_zero_exit_emits_failed_state() -> None:
     assert status is not None
     assert status.state is AttentionState.FAILED
     assert "code 2" in status.summary.lower()
+
+
+@pytest.mark.asyncio
+async def test_stop_session_does_not_wait_forever_for_backend_process() -> None:
+    registry = SessionRegistry()
+    manager = MonitorManager(
+        registry=registry,
+        process_stop_timeout=timedelta(milliseconds=10),
+    )
+    process = NeverExitingProcess()
+
+    await manager.start_session(
+        session_id="long-running",
+        adapter=ClaudeCodeAdapter(),
+        workspace="/tmp/long-running",
+        title="long-running",
+        output_lines=delayed_lines((0.0, "working"), (60.0, "still working")),
+        process=process,
+    )
+    await asyncio.sleep(0.01)
+
+    await asyncio.wait_for(manager.stop_session("long-running"), timeout=0.1)
+
+    status = await registry.get("long-running")
+    assert status is not None
+    assert process.terminate_called is True
+    assert status.live is False
+    assert status.state is AttentionState.RUNNING
+    assert status.state_reason == "monitor_stopped"
+    assert status.supported_actions == ["hide_pet", "mark_read", "manual_state_override"]
+
+
+@pytest.mark.asyncio
+async def test_stop_session_kills_backend_process_after_grace_timeout() -> None:
+    registry = SessionRegistry()
+    manager = MonitorManager(
+        registry=registry,
+        process_stop_timeout=timedelta(milliseconds=10),
+    )
+    process = TerminateIgnoringProcess()
+
+    await manager.start_session(
+        session_id="term-ignored",
+        adapter=ClaudeCodeAdapter(),
+        workspace="/tmp/term-ignored",
+        title="term-ignored",
+        output_lines=delayed_lines((0.0, "working"), (60.0, "still working")),
+        process=process,
+    )
+    await asyncio.sleep(0.01)
+
+    await asyncio.wait_for(manager.stop_session("term-ignored"), timeout=0.2)
+
+    status = await registry.get("term-ignored")
+    assert status is not None
+    assert process.terminate_called is True
+    assert process.kill_called is True
+    assert status.live is False
+    assert status.state_reason == "monitor_stopped"

@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import os
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import timedelta
 from pathlib import Path
 
@@ -13,6 +13,7 @@ from coding_pet.daemon.action_router import SessionActionRouter
 from coding_pet.daemon.manager import MonitorManager
 from coding_pet.daemon.session_registry import SessionRegistry
 from coding_pet.daemon.tmux_monitor import TmuxMonitorService
+from coding_pet.hooks import HookEvent, hook_event_from_message, status_for_hook_event
 from coding_pet.ipc.server import IpcServer
 from coding_pet.notifiers.base import Notifier
 from coding_pet.state_store import StateStore
@@ -40,6 +41,8 @@ class DaemonRuntime:
     notifier: Notifier | None = None
     stall_timeout: timedelta = timedelta(minutes=5)
     notification_cooldown: timedelta = timedelta(minutes=1)
+    completed_retention: timedelta | None = None
+    process_stop_timeout: timedelta = timedelta(seconds=2)
     action_router: SessionActionRouter | None = None
     ipc_server: IpcServer | None = None
     manager: MonitorManager | None = None
@@ -58,6 +61,8 @@ class DaemonRuntime:
                 stall_timeout=self.stall_timeout,
                 notifier=self.notifier,
                 notification_cooldown=self.notification_cooldown,
+                completed_retention=self.completed_retention,
+                process_stop_timeout=self.process_stop_timeout,
                 state_store=self.state_store,
             )
         if self.action_router is None:
@@ -73,6 +78,7 @@ class DaemonRuntime:
                 transcript_store=self.transcript_store,
             )
         self.ipc_server.action_handler = self.action_router.handle_message
+        self.ipc_server.hook_handler = self.handle_hook_event
         if self.ipc_server.transcript_store is None:
             self.ipc_server.transcript_store = self.transcript_store
 
@@ -80,6 +86,61 @@ class DaemonRuntime:
     def socket_path(self) -> Path:
         assert self.ipc_server is not None
         return self.ipc_server.socket_path
+
+    async def handle_hook_event(self, message: dict[str, object]) -> dict[str, object]:
+        try:
+            event = hook_event_from_message(message)
+        except ValueError as exc:
+            return {
+                "type": "hook_event_result",
+                "ok": False,
+                "reason": "invalid_hook_event",
+                "detail": str(exc),
+            }
+        event = await self._resolve_hook_target_event(event)
+        existing = await self.registry.get(event.session_id)
+        status = status_for_hook_event(event, existing=existing)
+        await self.registry.upsert(status)
+        await self._append_hook_transcript_event(
+            session_id=event.session_id,
+            text=f"{event.event_name}: {event.summary}",
+        )
+        return {
+            "type": "hook_event_result",
+            "ok": True,
+            "session_id": event.session_id,
+            "agent": event.agent_kind.value,
+            "event": event.event_name,
+            "state": event.state.value,
+        }
+
+    async def _resolve_hook_target_event(self, event: HookEvent) -> HookEvent:
+        existing = await self.registry.get(event.session_id)
+        if existing is not None:
+            return event
+        candidates = await self.registry.list_sessions()
+        event_workspace = _normalized_workspace(event.workspace)
+        for candidate in candidates:
+            if candidate.agent_kind is not event.agent_kind:
+                continue
+            if not candidate.live:
+                continue
+            if candidate.source_kind not in {"process", "tmux"}:
+                continue
+            if _normalized_workspace(candidate.workspace) == event_workspace:
+                return replace(event, session_id=candidate.session_id)
+        return event
+
+    async def _append_hook_transcript_event(self, *, session_id: str, text: str) -> None:
+        if self.transcript_store is None:
+            return
+        event = await self.transcript_store.append(
+            session_id=session_id,
+            direction="system",
+            source="hook_event",
+            text=text,
+        )
+        await self._broadcast_transcript_event(event)
 
     async def start(self) -> None:
         if self._started:
@@ -147,3 +208,13 @@ class DaemonRuntime:
         await self.manager.persist_snapshot()
         await self.ipc_server.stop()
         self._started = False
+
+
+def _normalized_workspace(value: str) -> str:
+    raw = value.strip()
+    if not raw:
+        return ""
+    try:
+        return Path(raw).expanduser().resolve(strict=False).as_posix()
+    except Exception:  # noqa: BLE001
+        return raw

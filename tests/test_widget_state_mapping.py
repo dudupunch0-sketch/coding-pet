@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from coding_pet.gui.session_panel import PanelAction, SessionPanelViewModel
-from coding_pet.models import AgentKind, AttentionState, SessionStatus
+from coding_pet.models import ActionCapability, AgentKind, AttentionState, SessionStatus
 
 
 def build_status(
@@ -114,6 +114,53 @@ def test_session_panel_exposes_actions_for_permission_and_input_workflows() -> N
     assert review_actions == [PanelAction.OPEN_WORKSPACE]
 
 
+def test_session_panel_filters_actions_by_session_supported_actions() -> None:
+    panel = SessionPanelViewModel()
+    permission = build_status("perm", AttentionState.NEEDS_PERMISSION).model_copy(
+        update={"supported_actions": ["approve"]}
+    )
+    input_without_reply = build_status("input", AttentionState.NEEDS_INPUT).model_copy(
+        update={"supported_actions": ["mark_read"]}
+    )
+
+    assert panel.actions_for(permission) == [PanelAction.APPROVE]
+    assert panel.actions_for(input_without_reply) == [PanelAction.OPEN_WORKSPACE]
+    assert panel.reply_shortcuts_for(input_without_reply) == []
+
+
+def test_session_panel_filters_actions_by_structured_capabilities() -> None:
+    panel = SessionPanelViewModel()
+    permission = build_status("perm", AttentionState.NEEDS_PERMISSION).model_copy(
+        update={
+            "supported_actions": [],
+            "action_capabilities": [
+                ActionCapability(
+                    action="approve",
+                    transport="tmux_buffer",
+                    semantics="agent_control",
+                )
+            ],
+        }
+    )
+    input_with_draft_only = build_status("input", AttentionState.NEEDS_INPUT).model_copy(
+        update={
+            "supported_actions": [],
+            "action_capabilities": [
+                ActionCapability(
+                    action="send_without_enter",
+                    transport="tmux_buffer",
+                    requires_text=True,
+                    semantics="agent_reply",
+                )
+            ],
+        }
+    )
+
+    assert panel.actions_for(permission) == [PanelAction.APPROVE]
+    assert panel.actions_for(input_with_draft_only) == [PanelAction.OPEN_WORKSPACE]
+    assert panel.reply_shortcuts_for(input_with_draft_only) == []
+
+
 def test_session_panel_marks_restored_sessions_read_only_and_disables_live_actions() -> None:
     panel = SessionPanelViewModel()
     restored = build_status("restored", AttentionState.NEEDS_PERMISSION).model_copy(
@@ -123,7 +170,7 @@ def test_session_panel_marks_restored_sessions_read_only_and_disables_live_actio
     rows = panel.rows_for([restored])
 
     assert rows[0].read_only is True
-    assert panel.actions_for(restored) == [PanelAction.OPEN_WORKSPACE]
+    assert panel.actions_for(restored) == [PanelAction.OPEN_WORKSPACE, PanelAction.HIDE_PET]
     assert panel.reply_shortcuts_for(restored) == []
 
 

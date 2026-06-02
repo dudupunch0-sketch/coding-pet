@@ -12,6 +12,9 @@ from coding_pet.gui.theme import (
     ThemeManifest,
     WidgetMood,
     WidgetTheme,
+    codex_pet_frame_count,
+    codex_pet_frame_duration_ms,
+    codex_pet_frame_rect,
     default_assets_root,
     is_image_sprite,
     load_manifest_for_theme,
@@ -33,12 +36,14 @@ class CodingPetWidgetShell:
         self,
         *,
         status: SessionStatus,
-        theme: WidgetTheme,
+        theme: WidgetTheme | str,
         on_detail_opened: Callable[[str], None] | None = None,
+        on_action_request: Callable[[dict[str, object]], None] | None = None,
     ) -> None:
         self.theme = theme
         self.status = status
         self._on_detail_opened = on_detail_opened
+        self._on_action_request = on_action_request
         self.panel = SessionPanelViewModel()
         self.assets_root = default_assets_root()
         self._theme_manifest = self._load_theme_manifest()
@@ -51,6 +56,9 @@ class CodingPetWidgetShell:
         self._detail_popup: Any | None = None
         self._transcript_events: list[TranscriptEvent] = []
         self._drag_origin: Any | None = None
+        self._animation_timer: Any | None = None
+        self._animation_frame = 0
+        self._animation_mood: str | None = None
         self._setup_qt_widget()
         self.update_status(status)
 
@@ -92,7 +100,11 @@ class CodingPetWidgetShell:
         updated = self.open_detail_panel()
         popup_events = list(self._transcript_events if events is None else events)
         if self._detail_popup is None:
-            self._detail_popup = DetailPopupShell(status=updated, events=popup_events)
+            self._detail_popup = DetailPopupShell(
+                status=updated,
+                events=popup_events,
+                on_action_request=self._on_action_request,
+            )
         else:
             self._detail_popup.update(updated, events=popup_events)
         self._detail_popup.show()
@@ -136,16 +148,19 @@ class CodingPetWidgetShell:
             from PySide6.QtCore import Qt
             from PySide6.QtGui import QFont
             from PySide6.QtWidgets import (
+                QApplication,
                 QLabel,
                 QVBoxLayout,
                 QWidget,
             )
         except ImportError:
             return
+        if QApplication.instance() is None:
+            return
 
         shell = self
 
-        class _Widget(QWidget):  # type: ignore[misc]
+        class _Widget(QWidget):
             def mousePressEvent(self, event: Any) -> None:  # noqa: N802
                 if event.button() is Qt.MouseButton.LeftButton:
                     shell._drag_origin = (
@@ -202,12 +217,16 @@ class CodingPetWidgetShell:
             sprite_mood = WidgetMood(mood)
         except ValueError:
             return None
+        asset_root = self._theme_manifest.asset_root or self.assets_root
+        if self._theme_manifest.spritesheet is not None:
+            asset_file = asset_root / self._theme_manifest.spritesheet.path
+            return asset_file.resolve() if asset_file.exists() else None
         sprite_path = resolve_sprite_for_mood(
             self._theme_manifest,
             mood=sprite_mood,
-            assets_root=self.assets_root,
+            assets_root=asset_root,
         )
-        asset_file = self.assets_root / sprite_path
+        asset_file = asset_root / sprite_path
         if asset_file.exists():
             return asset_file.resolve()
         return None
@@ -215,12 +234,13 @@ class CodingPetWidgetShell:
     def _set_pet_sprite(self, mood: str) -> None:
         asset_file = self.sprite_asset_path(mood)
         if asset_file is not None and is_image_sprite(asset_file):
-            if self._set_pet_pixmap(asset_file):
+            if self._set_pet_pixmap(asset_file, mood=mood):
                 return
         if self._pet_label is not None:
+            self._stop_animation()
             self._pet_label.setText(self._pet_glyph(mood, asset_file))
 
-    def _set_pet_pixmap(self, asset_file: Path) -> bool:
+    def _set_pet_pixmap(self, asset_file: Path, *, mood: str) -> bool:
         if self._pet_label is None:
             return False
         try:
@@ -231,15 +251,98 @@ class CodingPetWidgetShell:
         pixmap = QPixmap(str(asset_file))
         if pixmap.isNull():
             return False
+        source = self._atlas_frame(pixmap, mood=mood, frame=0)
         scaled = pixmap.scaled(
             96,
             96,
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.FastTransformation,
         )
+        if source is not None:
+            scaled = source.scaled(
+                96,
+                96,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.FastTransformation,
+            )
         self._pet_label.setText("")
         self._pet_label.setPixmap(scaled)
+        self._start_animation(asset_file, mood=mood)
         return True
+
+    def _atlas_frame(self, pixmap: Any, *, mood: str, frame: int) -> Any | None:
+        if self._theme_manifest is None or self._theme_manifest.spritesheet is None:
+            return None
+        try:
+            sprite_mood = WidgetMood(mood)
+        except ValueError:
+            return None
+        sheet = self._theme_manifest.spritesheet
+        rect = codex_pet_frame_rect(sheet, sprite_mood, frame=frame)
+        return pixmap.copy(
+            rect.x,
+            rect.y,
+            rect.width,
+            rect.height,
+        )
+
+    def _start_animation(self, asset_file: Path, *, mood: str) -> None:
+        if self._theme_manifest is None or self._theme_manifest.spritesheet is None:
+            self._stop_animation()
+            return
+        if self._animation_timer is not None and self._animation_mood == mood:
+            return
+        self._stop_animation()
+        try:
+            from PySide6.QtCore import Qt, QTimer
+            from PySide6.QtGui import QPixmap
+        except ImportError:
+            return
+        sheet = self._theme_manifest.spritesheet
+        try:
+            sprite_mood = WidgetMood(mood)
+        except ValueError:
+            return
+        frame_count = codex_pet_frame_count(sheet, sprite_mood)
+        pixmap = QPixmap(str(asset_file))
+        if pixmap.isNull():
+            return
+        self._animation_mood = mood
+        self._animation_frame = 0
+        timer = QTimer()
+
+        def tick() -> None:
+            if self._pet_label is None:
+                return
+            self._animation_frame = (self._animation_frame + 1) % frame_count
+            frame = self._atlas_frame(pixmap, mood=mood, frame=self._animation_frame)
+            if frame is None:
+                return
+            timer.setInterval(
+                codex_pet_frame_duration_ms(
+                    sheet,
+                    sprite_mood,
+                    frame=self._animation_frame,
+                )
+            )
+            self._pet_label.setPixmap(
+                frame.scaled(
+                    96,
+                    96,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.FastTransformation,
+                )
+            )
+
+        timer.timeout.connect(tick)
+        timer.start(codex_pet_frame_duration_ms(sheet, sprite_mood, frame=0))
+        self._animation_timer = timer
+
+    def _stop_animation(self) -> None:
+        if self._animation_timer is not None:
+            self._animation_timer.stop()
+        self._animation_timer = None
+        self._animation_mood = None
 
     def _pet_glyph(self, mood: str, asset_file: Path | None = None) -> str:
         if asset_file is not None and not is_image_sprite(asset_file):

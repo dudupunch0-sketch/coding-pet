@@ -5,13 +5,14 @@ import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from coding_pet.daemon.session_registry import SessionRegistry
 from coding_pet.transcripts.store import TranscriptStore
 
 SessionCallback = Callable[[dict[str, Any]], Awaitable[None]]
 ActionCallback = Callable[[dict[str, object]], Awaitable[dict[str, object] | None]]
+HookCallback = Callable[[dict[str, object]], Awaitable[dict[str, object] | None]]
 
 
 @dataclass(slots=True)
@@ -19,6 +20,7 @@ class IpcServer:
     socket_path: Path
     registry: SessionRegistry
     action_handler: ActionCallback | None = None
+    hook_handler: HookCallback | None = None
     transcript_store: TranscriptStore | None = None
     _server: asyncio.AbstractServer | None = field(init=False, default=None)
     _writers: set[asyncio.StreamWriter] = field(init=False, default_factory=set)
@@ -58,7 +60,31 @@ class IpcServer:
                 line = await reader.readline()
                 if not line:
                     break
-                message = json.loads(line)
+                try:
+                    raw_message = json.loads(line)
+                except json.JSONDecodeError:
+                    await self._send(
+                        writer,
+                        {
+                            "type": "error",
+                            "ok": False,
+                            "reason": "invalid_json",
+                            "detail": "message must be newline-delimited JSON",
+                        },
+                    )
+                    continue
+                if not isinstance(raw_message, dict):
+                    await self._send(
+                        writer,
+                        {
+                            "type": "error",
+                            "ok": False,
+                            "reason": "invalid_message",
+                            "detail": "message must be a JSON object",
+                        },
+                    )
+                    continue
+                message = cast(dict[str, Any], raw_message)
                 if message.get("type") == "ping":
                     await self._send(writer, {"type": "ping"})
                 elif message.get("type") == "action_request" and self.action_handler is not None:
@@ -73,6 +99,21 @@ class IpcServer:
                         if key in message:
                             payload[key] = message[key]
                     result = await self.action_handler(payload)
+                    if result is not None:
+                        await self._send(writer, result)
+                elif message.get("type") == "hook_event" and self.hook_handler is not None:
+                    hook_payload: dict[str, object] = {"type": "hook_event"}
+                    for key in (
+                        "agent",
+                        "event",
+                        "session_id",
+                        "workspace",
+                        "title",
+                        "summary",
+                    ):
+                        if key in message:
+                            hook_payload[key] = message[key]
+                    result = await self.hook_handler(hook_payload)
                     if result is not None:
                         await self._send(writer, result)
                 elif message.get("type") == "transcript_request":

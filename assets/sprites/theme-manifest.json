@@ -1,13 +1,13 @@
 {
-  "theme": "company-pet",
+  "theme": "codex-default",
   "sprites": {
-    "idle": "company-pet/idle.png",
-    "typing": "company-pet/typing.png",
-    "celebrate": "company-pet/celebrate.png",
-    "alert": "company-pet/alert.png",
-    "thinking": "company-pet/thinking.png",
-    "sleepy": "company-pet/sleepy.png",
-    "sad": "company-pet/sad.png"
+    "idle": "codex-default/idle.png",
+    "typing": "codex-default/typing.png",
+    "celebrate": "codex-default/celebrate.png",
+    "alert": "codex-default/alert.png",
+    "thinking": "codex-default/thinking.png",
+    "sleepy": "codex-default/sleepy.png",
+    "sad": "codex-default/sad.png"
   },
   "audio": {}
 }

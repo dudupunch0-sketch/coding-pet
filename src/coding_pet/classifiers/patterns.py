@@ -17,9 +17,12 @@ FAILED_PATTERNS = (
 PERMISSION_PATTERNS = (
     re.compile(r"(?i)\ballow\b"),
     re.compile(r"(?i)\bapprove\b"),
+    re.compile(r"(?i)\bapproval required\b"),
     re.compile(r"(?i)permission"),
     re.compile(r"(?i)do you want to proceed"),
     re.compile(r"(?i)run this command"),
+    re.compile(r"(?i)allow codex"),
+    re.compile(r"(?i)codex.*run"),
     re.compile(r"실행할까요"),
     re.compile(r"승인"),
     re.compile(r"권한"),
@@ -46,9 +49,9 @@ INPUT_PATTERNS = (
     re.compile(r"(?i)do you want"),
     re.compile(r"(?i)can you confirm"),
     re.compile(r"어떤"),
-    re.compile(r"확인해"),
+    re.compile(r"확인"),
     re.compile(r"계속할까요"),
-    re.compile(r"입력해"),
+    re.compile(r"입력"),
     re.compile(r"알려주세요"),
 )
 

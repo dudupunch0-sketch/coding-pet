@@ -29,8 +29,14 @@ async def _readlines(stream: asyncio.StreamReader) -> AsyncIterator[str]:
         yield line.decode(errors="replace").rstrip("\n")
 
 
-async def _send_process_message(stdin: StdinWriter, message: str) -> None:
-    stdin.write((message + "\n").encode())
+async def _send_process_message(
+    stdin: StdinWriter,
+    message: str,
+    *,
+    press_enter: bool = True,
+) -> None:
+    suffix = "\n" if press_enter else ""
+    stdin.write((message + suffix).encode())
     await stdin.drain()
 
 
@@ -84,13 +90,14 @@ class DaemonApp:
                         reason="unsupported_action",
                         detail=f"{request.action} is not supported by {agent_kind.value}",
                     )
-                await _send_process_message(stdin, message)
+                await _send_process_message(stdin, message, press_enter=request.press_enter)
                 return {
                     "type": "action_result",
                     "session_id": request.session_id,
                     "action": request.action,
                     "ok": True,
                     "reason": "delivered",
+                    "delivered_text": message,
                     "detail": f"{message} delivered",
                 }
         else:

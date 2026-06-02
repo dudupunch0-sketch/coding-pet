@@ -127,6 +127,70 @@ async def test_ipc_ping_returns_pong(tmp_path: Path) -> None:
         await server.stop()
 
 
+@pytest.mark.asyncio
+async def test_ipc_reports_malformed_json_and_keeps_connection_alive(
+    tmp_path: Path,
+) -> None:
+    registry = SessionRegistry()
+    server = IpcServer(socket_path=tmp_path / "coding-pet.sock", registry=registry)
+    await server.start()
+    client = IpcClient(server.socket_path)
+    try:
+        await client.connect()
+        await client.read_message()
+
+        assert client._writer is not None
+        client._writer.write(b"{not-json\n")
+        await client._writer.drain()
+
+        error = await client.read_message()
+        await client.send({"type": "ping"})
+        pong = await client.read_message()
+    finally:
+        await client.close()
+        await server.stop()
+
+    assert error == {
+        "type": "error",
+        "ok": False,
+        "reason": "invalid_json",
+        "detail": "message must be newline-delimited JSON",
+    }
+    assert pong == {"type": "ping"}
+
+
+@pytest.mark.asyncio
+async def test_ipc_reports_non_object_message_and_keeps_connection_alive(
+    tmp_path: Path,
+) -> None:
+    registry = SessionRegistry()
+    server = IpcServer(socket_path=tmp_path / "coding-pet.sock", registry=registry)
+    await server.start()
+    client = IpcClient(server.socket_path)
+    try:
+        await client.connect()
+        await client.read_message()
+
+        assert client._writer is not None
+        client._writer.write(b'["not", "an", "object"]\n')
+        await client._writer.drain()
+
+        error = await client.read_message()
+        await client.send({"type": "ping"})
+        pong = await client.read_message()
+    finally:
+        await client.close()
+        await server.stop()
+
+    assert error == {
+        "type": "error",
+        "ok": False,
+        "reason": "invalid_message",
+        "detail": "message must be a JSON object",
+    }
+    assert pong == {"type": "ping"}
+
+
 
 @pytest.mark.asyncio
 async def test_ipc_forwards_press_enter_and_state_override_in_action_requests(
@@ -174,6 +238,57 @@ async def test_ipc_forwards_press_enter_and_state_override_in_action_requests(
         "reply_text": "  raw  ",
         "press_enter": False,
         "state_override": "running",
+    }]
+
+
+@pytest.mark.asyncio
+async def test_ipc_forwards_hook_events(tmp_path: Path) -> None:
+    registry = SessionRegistry()
+    received: list[dict[str, object]] = []
+
+    async def handle_hook(message: dict[str, object]) -> dict[str, object]:
+        received.append(message)
+        return {
+            "type": "hook_event_result",
+            "session_id": "hook-claude_code-abc",
+            "ok": True,
+            "state": "running",
+        }
+
+    server = IpcServer(
+        socket_path=tmp_path / "coding-pet.sock",
+        registry=registry,
+        hook_handler=handle_hook,
+    )
+    await server.start()
+    client = IpcClient(server.socket_path)
+    try:
+        await client.connect()
+        await client.read_message()
+        await client.send({
+            "type": "hook_event",
+            "agent": "claude_code",
+            "event": "PreToolUse",
+            "session_id": "abc",
+            "workspace": "/work",
+            "title": "Hooked",
+            "summary": "tool started",
+        })
+        result = await client.read_message()
+    finally:
+        await client.close()
+        await server.stop()
+
+    assert result["type"] == "hook_event_result"
+    assert result["ok"] is True
+    assert received == [{
+        "type": "hook_event",
+        "agent": "claude_code",
+        "event": "PreToolUse",
+        "session_id": "abc",
+        "workspace": "/work",
+        "title": "Hooked",
+        "summary": "tool started",
     }]
 
 

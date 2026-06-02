@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import pytest
+
 from coding_pet.agents.claude_code import ClaudeCodeAdapter
 from coding_pet.models import AgentKind, AttentionState
 
@@ -55,5 +57,17 @@ def test_claude_adapter_control_messages_cover_reply_and_approval_actions() -> N
     adapter = ClaudeCodeAdapter()
 
     assert adapter.control_message(action="send_reply", reply_text="keep going") == "keep going"
+    assert adapter.control_message(action="send_without_enter", reply_text="draft") == "draft"
     assert adapter.control_message(action="approve") == "approve"
     assert adapter.control_message(action="reject") == "reject"
+
+
+def test_claude_adapter_control_messages_can_be_overridden(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CODING_PET_CLAUDE_CODE_APPROVE_TEXT", "yes")
+    monkeypatch.setenv("CODING_PET_CLAUDE_REJECT_TEXT", "no")
+    adapter = ClaudeCodeAdapter()
+
+    assert adapter.control_message(action="approve") == "yes"
+    assert adapter.control_message(action="reject") == "no"

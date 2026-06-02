@@ -2,11 +2,17 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Literal, cast
 
 from coding_pet.daemon.session_registry import SessionRegistry
 from coding_pet.logging import ContextAdapter, get_logger
-from coding_pet.models import AttentionState
+from coding_pet.models import (
+    ActionOutcome,
+    AttentionState,
+    attention_priority,
+    normalize_action_result_message,
+)
 
 ActionResult = dict[str, object]
 SupportedAction = Literal[
@@ -43,14 +49,35 @@ def failure_result(
     reason: str,
     detail: str,
 ) -> ActionResult:
-    return {
-        "type": "action_result",
-        "session_id": session_id,
-        "action": action,
-        "ok": False,
-        "reason": reason,
-        "detail": detail,
-    }
+    return normalize_action_result_message(
+        {
+            "type": "action_result",
+            "session_id": session_id,
+            "action": action,
+            "ok": False,
+            "reason": reason,
+            "detail": detail,
+        }
+    )
+
+
+def local_success_result(
+    *,
+    session_id: str,
+    action: str,
+    reason: str,
+    detail: str,
+) -> ActionResult:
+    return normalize_action_result_message(
+        {
+            "type": "action_result",
+            "session_id": session_id,
+            "action": action,
+            "outcome": ActionOutcome.LOCAL_UPDATED.value,
+            "reason": reason,
+            "detail": detail,
+        }
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,7 +169,8 @@ class SessionActionRouter:
                 detail=str(exc),
             )
 
-        if await self.registry.get(request.session_id) is None:
+        status = await self.registry.get(request.session_id)
+        if status is None:
             self._logger.warning(
                 "Rejected action for missing session",
                 extra={"session_id": request.session_id},
@@ -152,6 +180,49 @@ class SessionActionRouter:
                 action=request.action,
                 reason="session_not_found",
                 detail="session not found",
+            )
+
+        if request.action == "mark_read":
+            await self.registry.mark_read(request.session_id)
+            return local_success_result(
+                session_id=request.session_id,
+                action=request.action,
+                reason="marked_read",
+                detail="session marked read",
+            )
+
+        if request.action == "manual_state_override" and request.state_override is not None:
+            updated = status.model_copy(
+                update={
+                    "state": request.state_override,
+                    "summary": f"Manual state: {request.state_override.value}",
+                    "state_reason": "manual_state_override",
+                    "attention_score": attention_priority(request.state_override),
+                    "last_event_at": datetime.now(UTC),
+                }
+            )
+            await self.registry.upsert(updated)
+            return local_success_result(
+                session_id=request.session_id,
+                action=request.action,
+                reason="state_overridden",
+                detail=f"state set to {request.state_override.value}",
+            )
+
+        if request.action == "hide_pet":
+            if self.is_session_live(request.session_id):
+                return failure_result(
+                    session_id=request.session_id,
+                    action=request.action,
+                    reason="session_live",
+                    detail="live sessions cannot be hidden without stopping their control source",
+                )
+            await self.registry.remove(request.session_id)
+            return local_success_result(
+                session_id=request.session_id,
+                action=request.action,
+                reason="hidden",
+                detail="session hidden",
             )
 
         if not self.is_session_live(request.session_id):
@@ -166,4 +237,16 @@ class SessionActionRouter:
                 detail="session is not live",
             )
 
-        return await self.dispatch_action(request)
+        if status.has_action_restrictions() and not status.supports_action(request.action):
+            self._logger.warning(
+                "Rejected action outside session capability",
+                extra={"session_id": request.session_id, "action": request.action},
+            )
+            return failure_result(
+                session_id=request.session_id,
+                action=request.action,
+                reason="action_not_supported",
+                detail=f"{request.action} is not supported by this session",
+            )
+
+        return normalize_action_result_message(await self.dispatch_action(request))

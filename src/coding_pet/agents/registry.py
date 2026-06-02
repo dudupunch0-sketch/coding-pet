@@ -5,8 +5,20 @@ from dataclasses import dataclass
 
 from coding_pet.agents.base import AgentAdapter
 from coding_pet.agents.claude_code import ClaudeCodeAdapter
+from coding_pet.agents.codex import CodexAdapter
 from coding_pet.agents.opencode import OpenCodeAdapter
 from coding_pet.models import AgentKind
+
+_AGENT_ORDER = {
+    AgentKind.CLAUDE_CODE: 0,
+    AgentKind.OPENCODE: 10,
+    AgentKind.CODEX: 20,
+}
+
+
+def default_agent_adapters() -> dict[AgentKind, AgentAdapter]:
+    adapters = [ClaudeCodeAdapter(), OpenCodeAdapter(), CodexAdapter()]
+    return {adapter.agent_kind(): adapter for adapter in adapters}
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,9 +37,8 @@ class AgentBackendRegistry:
 
     @classmethod
     def default(cls) -> AgentBackendRegistry:
-        adapters = [ClaudeCodeAdapter(), OpenCodeAdapter()]
         backends: dict[AgentKind, AgentBackendStatus] = {}
-        for adapter in adapters:
+        for adapter in default_agent_adapters().values():
             binary_name = adapter.binary_name()
             binary_path = shutil.which(binary_name)
             available = binary_path is not None
@@ -50,5 +61,5 @@ class AgentBackendRegistry:
         return self._backends[agent_kind]
 
     def list_all(self) -> list[AgentBackendStatus]:
-        ordered_kinds = sorted(self._backends, key=lambda item: item.value)
+        ordered_kinds = sorted(self._backends, key=lambda item: _AGENT_ORDER[item])
         return [self._backends[kind] for kind in ordered_kinds]

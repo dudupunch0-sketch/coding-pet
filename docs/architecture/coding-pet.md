@@ -2,7 +2,7 @@
 
 ## Goal
 
-coding-pet monitors multiple AI coding agent sessions and presents their state through small desktop pets, a shared session panel, notifications, and persisted state.
+coding-pet monitors multiple AI coding agent sessions and presents their state through small desktop pets, a shared session panel, notifications, and persisted state. Claude Code and OpenCode are the production targets; Codex support is optional and kept as a local development adapter.
 
 ## High-level components
 
@@ -11,6 +11,7 @@ Files:
 - `src/coding_pet/agents/base.py`
 - `src/coding_pet/agents/claude_code.py`
 - `src/coding_pet/agents/opencode.py`
+- `src/coding_pet/agents/codex.py`
 - `src/coding_pet/agents/registry.py`
 
 Responsibilities:
@@ -18,7 +19,9 @@ Responsibilities:
 - build initial `SessionStatus`
 - classify output lines through the shared classifier
 - provide agent-specific launch commands
+- provide adapter-defined control messages for reply, approval, and rejection actions
 - report whether local backend binaries are available so daemon/CLI flows can degrade cleanly
+- keep optional adapters, such as Codex, outside the production assumptions for the company server
 
 ### 2. Daemon core
 Files:
@@ -38,8 +41,10 @@ Responsibilities:
 - notify users on important state transitions
 - persist snapshots to disk for restart recovery
 - validate and route widget action requests through a daemon-owned control path
+- enforce each session's `action_capabilities` before dispatching live control,
+  while preserving legacy `supported_actions` snapshots
 - discover and poll already-running tmux panes when tmux monitoring is enabled
-- preserve raw dashboard input by delivering it through tmux buffers instead of shell-quoted strings
+- preserve raw dashboard input and adapter-defined control messages by delivering them through tmux buffers instead of shell-quoted strings
 - distinguish live sessions from restored snapshot-only sessions
 - resolve adapters through the backend registry instead of hardcoded daemon selection
 
@@ -54,7 +59,11 @@ Core types:
 - `SessionStatus`
 - `SessionEvent`
 
-These models are the contract between daemon, IPC, persistence, and widget layers.
+These models are the contract between daemon, IPC, persistence, and widget
+layers. `SessionStatus.action_capabilities` records which daemon actions are
+safe for that session and the transport/semantics behind each action. The older
+`supported_actions` list is still populated for snapshot compatibility.
+Restored/inactive sessions are reduced to local-only actions.
 
 ### 4. IPC layer
 Files:
@@ -74,15 +83,31 @@ Supported message types:
 - `transcript_request`
 - `transcript_snapshot`
 - `transcript_appended`
+- `hook_event`
+- `hook_event_result`
 - `ping`
 
 Behavior:
 - a new widget receives a full snapshot first
 - later updates stream incrementally
 - widget action requests are sent back over the same socket and acknowledged with `action_result`
-- `action_result` now carries a stable `reason` string for degraded failures such as unavailable backends, inactive sessions, or missing live control
+- malformed JSON and non-object IPC payloads are answered with structured
+  `error` messages while keeping the connection alive
+- `action_result` carries a stable `outcome` value plus legacy-compatible
+  `ok`, `reason`, and `detail` fields; normalized outcomes cover `accepted`,
+  `local_updated`, `rejected`, `timed_out`, `unsupported`, and
+  `backend_failed`
+- degraded failures still use stable `reason` strings such as unavailable
+  backends, inactive sessions, unsupported session capabilities, or missing
+  live control
+- `mark_read` is a daemon-local session-state action and does not require an agent control channel
+- `hide_pet` is a daemon-local dismiss action for inactive sessions; live control
+  sources must stop or disappear before they can be hidden
+- `manual_state_override` is a daemon-local correction action and does not
+  require an agent control channel
 - `transcript_request` returns recent transcript rows for one session, or an empty `ok=false` snapshot when transcripts are unavailable
 - daemon-side transcript appends are broadcast as `transcript_appended` so an open detail popup can stay current
+- Claude Code/OpenCode hook scripts can send `hook_event` messages to update pet state without network access
 - reconnecting widgets can rebuild state without restarting the daemon
 
 ### 5. Widget layer
@@ -102,12 +127,13 @@ Responsibilities:
 - map daemon session state to pet mood and bubble text
 - keep a stable multi-pet layout on screen
 - expose a shared panel view model for urgent sessions and actions
-- show a per-session detail popup model with target identity, last input, agent request, transcript rows, and raw reply action request helpers
+- show a per-session detail popup model with target identity, last input, agent request, transcript rows, and raw reply/attach action request helpers
 - bootstrap from persisted snapshot before live IPC updates arrive
 - render transient success/failure action feedback without overwriting the real session summary
 - treat restored snapshot sessions as read-only in the panel
 - on detail-popup open, request the latest transcript snapshot and send `mark_read`; later `transcript_snapshot` and `transcript_appended` messages update the popup model
-- discover the default `company-pet` PNG theme and the registered PMD SpriteCollab sample character themes from source assets, `CODING_PET_ASSETS_DIR`, or installed `share/coding-pet/assets`
+- route detail-popup send, send-without-enter, and attach actions back to the daemon over IPC
+- discover the default `codex-default` PNG theme and the registered PMD SpriteCollab sample character themes from source assets, `CODING_PET_ASSETS_DIR`, or installed `share/coding-pet/assets`
 - keep the classic text theme available as an explicit fallback
 
 Current implementation notes:
@@ -135,7 +161,13 @@ Responsibilities:
 - store the latest session snapshot in JSON form
 - restore known sessions after restart as non-live/read-only state
 - provide widget bootstrap state before the daemon socket is available
-- store timestamped transcript events in SQLite for tmux output, dashboard input, and system notes
+- write snapshots through a temporary file and atomic replace so interrupted
+  writes keep the previous snapshot intact
+- quarantine unreadable or schema-invalid snapshots as `state.json.invalid.*`
+  and continue startup with an empty restored snapshot
+- store timestamped transcript events in SQLite for tmux output, dashboard
+  input, hook events, and system notes
+- redact common token/password/API key patterns before transcript persistence
 
 Default paths:
 - `~/.local/state/coding-pet/state.json`
@@ -156,13 +188,27 @@ Default paths:
 9. `SessionActionRouter` validates those requests and `MonitorManager` dispatches them through the live session control handler.
 10. The widget receives `action_result` acknowledgements and shows transient UI feedback until newer session output arrives.
 
+### hook-driven sessions
+
+1. Claude Code hooks or OpenCode plugins call the local hook script.
+2. The hook script extracts session/workspace/title/summary from common stdin
+   JSON aliases or environment overrides, then sends `hook_event` over the
+   daemon Unix socket without external network access.
+3. `DaemonRuntime` converts the event to a `SessionStatus(source_kind="hook")`.
+4. The same event is stored as a `hook_event` transcript row and broadcast as
+   `transcript_appended`, so detail popups keep a local event timeline even when
+   no tmux transcript is available.
+
 ### tmux-discovered sessions
 
 1. `TmuxMonitorService` calls `tmux list-panes -a` and applies include/exclude rules.
-2. Matched Claude Code/OpenCode panes become `SessionStatus(source_kind="tmux")` entries with pane/session/cwd metadata.
+2. Matched Claude Code/OpenCode panes become `SessionStatus(source_kind="tmux")` entries with pane/session/cwd metadata. Codex panes may also match in local development, but Codex is not required on the company server.
 3. The monitor captures recent output with `tmux capture-pane -p -J -S -N`, diffs snapshots, stores new output in SQLite transcripts, and best-effort broadcasts appended transcript events to connected widgets.
 4. `AgentStateClassifier` evaluates the snapshot with deterministic patterns; no LLM call is used for status detection.
-5. Daemon tmux action handlers for `send_reply` and `send_without_enter` preserve raw text and call `tmux load-buffer`, `paste-buffer`, and optional `send-keys Enter`.
+5. Daemon tmux action handlers for `send_reply` and `send_without_enter` preserve raw text and call `tmux load-buffer`, `paste-buffer`, and optional `send-keys Enter`. For `approve` and `reject`, the matched agent adapter supplies the control text before the same tmux delivery path is used.
+6. When a matched pane disappears, failed sessions keep their failure state for
+   operator review. Other sessions become inactive `completed` sessions and are
+   removed after the configured completed-session retention window.
 
 ## Concurrency model
 
@@ -176,15 +222,28 @@ Default paths:
 - daemon-side snapshot persistence writes the latest session set to disk
 - widget can load the snapshot before it connects to the daemon socket
 - restored snapshot sessions are treated as non-live/read-only until a live daemon snapshot replaces them
+- restored inactive completed sessions are skipped when their completed-session
+  retention window already elapsed; recent completed sessions only keep the
+  remaining display time
+- process-launched sessions set `live=false` when their monitored process exits
+- when a process-launched monitor is stopped by daemon shutdown or
+  `stop_session`, the daemon best-effort terminates the owned process and marks
+  the snapshot inactive without pretending the agent completed successfully;
+  after `CODING_PET_PROCESS_STOP_TIMEOUT_SEC`, it uses a kill fallback
+- tmux-discovered sessions set `live=false` when their pane disappears; failed
+  sessions preserve failure state, while other disappeared panes become
+  inactive `completed` sessions
 - reconnecting IPC clients receive a fresh snapshot immediately
 - reconnect clears stale action feedback so the snapshot becomes the source of truth again
 
 ## Current gaps
 
-- actual agent-native approval/rejection semantics are still stdin-string based placeholders rather than proven per-agent protocols
+- actual agent-native approval/rejection semantics are still adapter-defined stdin strings rather than proven per-agent protocols
 - the PySide6 environment on this host is still unavailable for real manual GUI runs, so some UX work remains test-driven only
-- full PySide6 detail-popup send/attach button wiring still needs target-host validation; the daemon action handlers and headless request builders are covered by tests
-- this server still uses constrained degraded-mode operation for Claude Code/OpenCode because those binaries are not installed locally
-- default sprite/theme assets are original internal pilot art, not third-party character art; PMD SpriteCollab sample character themes are bundled separately for non-commercial selectable-character testing, and final company brand art can replace them through new complete themes
-- transcript capture is a bounded tmux screen-diff log; robust redaction and perfect TTY replay are future work
+- full manual PySide6 detail-popup UX still needs target-host validation; send/attach action wiring, daemon action handlers, and headless request builders are covered by tests
+- this server still uses constrained degraded-mode operation for Claude Code/OpenCode because those binaries are not installed locally; the optional Codex adapter follows the same degraded behavior
+- default `codex-default` sprite/theme assets are generated original repo art, not third-party character art; PMD SpriteCollab sample character themes are bundled separately for non-commercial selectable-character testing, and final company brand art or approved Codex/Petdex packages can replace them through complete imported themes
+- transcript capture is a bounded tmux screen-diff log; common secret patterns
+  and configured organization-specific regexes are redacted, while perfect TTY
+  replay is future work
 - company-server GUI/backend behavior still needs validation on the actual target environment

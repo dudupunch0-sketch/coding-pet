@@ -8,9 +8,9 @@ from typing import Any
 
 from coding_pet.gui.runtime import has_graphical_session
 from coding_pet.gui.session_panel import PanelAction
-from coding_pet.gui.theme import WidgetTheme, default_theme
+from coding_pet.gui.theme import configured_theme
 from coding_pet.ipc.client import IpcClient
-from coding_pet.models import AttentionState, SessionStatus
+from coding_pet.models import AttentionState, SessionStatus, normalize_action_result_message
 from coding_pet.state_store import StateStore
 from coding_pet.transcripts.model import TranscriptEvent
 
@@ -37,7 +37,7 @@ def layout_sessions(
 
 @dataclass(slots=True)
 class CodingPetWidgetApp:
-    theme: WidgetTheme = field(default_factory=default_theme)
+    theme: str = field(default_factory=configured_theme)
     socket_path: Path | None = None
     state_store: StateStore | None = None
     widgets: dict[str, Any] = field(default_factory=dict)
@@ -88,6 +88,7 @@ class CodingPetWidgetApp:
                     status=status,
                     theme=self.theme,
                     on_detail_opened=self._on_widget_detail_opened,
+                    on_action_request=self._on_widget_action_request,
                 )
                 self.widgets[status.session_id] = widget
             widget.update_status(status)
@@ -153,6 +154,11 @@ class CodingPetWidgetApp:
             payload["reply_text"] = reply_text
         await self._client.send(payload)
 
+    async def send_action_request(self, payload: dict[str, object]) -> None:
+        if self._client is None:
+            raise RuntimeError("widget is not connected to the daemon")
+        await self._client.send(payload)
+
     async def request_transcript(self, session_id: str, *, limit: int = 100) -> None:
         if self._client is None:
             raise RuntimeError("widget is not connected to the daemon")
@@ -188,6 +194,7 @@ class CodingPetWidgetApp:
                 self.show_sessions([widget.status for widget in self.widgets.values()])
             return
         if message_type == "action_result":
+            message = normalize_action_result_message(message)
             self.last_action_result = message
             session_id = message.get("session_id")
             detail = message.get("detail")
@@ -238,6 +245,15 @@ class CodingPetWidgetApp:
         except RuntimeError:
             return
         loop.create_task(self._send_detail_opened_requests(session_id))
+
+    def _on_widget_action_request(self, payload: dict[str, object]) -> None:
+        if self._client is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        loop.create_task(self.send_action_request(payload))
 
     async def _send_detail_opened_requests(self, session_id: str) -> None:
         if self._client is None:

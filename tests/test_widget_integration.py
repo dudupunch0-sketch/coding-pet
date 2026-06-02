@@ -65,8 +65,13 @@ async def test_widget_app_applies_snapshot_and_incremental_updates(tmp_path: Pat
 
 @pytest.mark.asyncio
 async def test_widget_app_preserves_deterministic_layout_with_two_live_sessions(
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    monkeypatch.setattr(
+        "coding_pet.gui.app.CodingPetWidgetApp.ensure_app",
+        lambda self: (_ for _ in ()).throw(RuntimeError("no deterministic test screen")),
+    )
     registry = SessionRegistry()
     server = IpcServer(socket_path=tmp_path / "coding-pet.sock", registry=registry)
     await server.start()
@@ -154,4 +159,35 @@ async def test_widget_detail_open_requests_transcript_and_marks_read() -> None:
     assert fake_client.sent == [
         {"type": "transcript_request", "session_id": "tmux-%3", "limit": 100},
         {"type": "action_request", "session_id": "tmux-%3", "action": "mark_read"},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_widget_detail_popup_actions_are_sent_over_ipc() -> None:
+    app = CodingPetWidgetApp()
+    fake_client = FakeClient()
+    status = build_status("tmux-%3", AttentionState.NEEDS_INPUT).model_copy(
+        update={
+            "source_kind": "tmux",
+            "tmux_pane_id": "%3",
+        }
+    )
+    app.show_sessions([status])
+    app._client = fake_client  # type: ignore[assignment]
+
+    popup = app.widgets["tmux-%3"].open_detail_popup()
+    await asyncio.sleep(0)
+    fake_client.sent.clear()
+
+    popup.submit_reply("  keep going\n$HOME  ", press_enter=False)
+    await asyncio.sleep(0)
+
+    assert fake_client.sent == [
+        {
+            "type": "action_request",
+            "session_id": "tmux-%3",
+            "action": "send_without_enter",
+            "reply_text": "  keep going\n$HOME  ",
+            "press_enter": False,
+        }
     ]

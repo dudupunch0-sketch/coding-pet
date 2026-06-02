@@ -60,7 +60,7 @@ class AgentStateClassifier:
         if signal is not None and snapshot_changed:
             return AgentStateDecision(
                 state=AttentionState.RUNNING,
-                summary="작업 중...",
+                summary="Working...",
                 reason="snapshot_changed",
             )
 
@@ -74,13 +74,13 @@ class AgentStateClassifier:
         if snapshot_changed:
             return AgentStateDecision(
                 state=AttentionState.RUNNING,
-                summary="작업 중...",
+                summary="Working...",
                 reason="snapshot_changed",
             )
 
         return AgentStateDecision(
             state=AttentionState.IDLE,
-            summary="대기 중",
+            summary="Waiting",
             reason="unchanged_below_stall_threshold",
         )
 
@@ -141,10 +141,10 @@ class AgentStateClassifier:
 
     def _summary_for(self, state: AttentionState) -> str:
         return {
-            AttentionState.FAILED: "오류 발생",
-            AttentionState.NEEDS_PERMISSION: "승인 필요",
-            AttentionState.NEEDS_CHOICE: "선택 필요",
-            AttentionState.NEEDS_INPUT: "입력 필요",
-            AttentionState.COMPLETED: "완료됨",
-            AttentionState.RUNNING: "작업 중...",
+            AttentionState.FAILED: "Error detected",
+            AttentionState.NEEDS_PERMISSION: "Approval needed",
+            AttentionState.NEEDS_CHOICE: "Choice needed",
+            AttentionState.NEEDS_INPUT: "Input needed",
+            AttentionState.COMPLETED: "Completed",
+            AttentionState.RUNNING: "Working...",
         }[state]

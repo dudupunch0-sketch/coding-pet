@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from coding_pet.agents.claude_code import ClaudeCodeAdapter
+from coding_pet.agents.codex import CodexAdapter
 from coding_pet.agents.opencode import OpenCodeAdapter
 from coding_pet.models import AgentKind
 
@@ -17,11 +18,15 @@ def test_backend_registry_reports_missing_binaries(
     registry = AgentBackendRegistry.default()
 
     claude = registry.describe(AgentKind.CLAUDE_CODE)
+    codex = registry.describe(AgentKind.CODEX)
     opencode = registry.describe(AgentKind.OPENCODE)
 
     assert claude.available is False
     assert claude.binary_name == "claude"
     assert "not installed" in claude.reason
+    assert codex.available is False
+    assert codex.binary_name == "codex"
+    assert "not installed" in codex.reason
     assert opencode.available is False
     assert opencode.binary_name == "opencode"
     assert "not installed" in opencode.reason
@@ -37,6 +42,8 @@ def test_backend_registry_reports_available_binaries(
             return "/usr/local/bin/claude"
         if name == "opencode":
             return "/usr/local/bin/opencode"
+        if name == "codex":
+            return "/usr/local/bin/codex"
         return None
 
     monkeypatch.setattr("coding_pet.agents.registry.shutil.which", fake_which)
@@ -44,6 +51,7 @@ def test_backend_registry_reports_available_binaries(
     registry = AgentBackendRegistry.default()
 
     claude = registry.describe(AgentKind.CLAUDE_CODE)
+    codex = registry.describe(AgentKind.CODEX)
     opencode = registry.describe(AgentKind.OPENCODE)
 
     assert claude.available is True
@@ -52,3 +60,6 @@ def test_backend_registry_reports_available_binaries(
     assert opencode.available is True
     assert opencode.binary_path == "/usr/local/bin/opencode"
     assert isinstance(opencode.adapter, OpenCodeAdapter)
+    assert codex.available is True
+    assert codex.binary_path == "/usr/local/bin/codex"
+    assert isinstance(codex.adapter, CodexAdapter)

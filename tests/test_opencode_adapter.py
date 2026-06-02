@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import pytest
+
 from coding_pet.agents.opencode import OpenCodeAdapter
 from coding_pet.models import AgentKind, AttentionState
 
@@ -57,5 +59,17 @@ def test_opencode_adapter_control_messages_cover_reply_and_approval_actions() ->
     assert adapter.control_message(action="send_reply", reply_text="summarize shortly") == (
         "summarize shortly"
     )
+    assert adapter.control_message(action="send_without_enter", reply_text="draft") == "draft"
     assert adapter.control_message(action="approve") == "approve"
     assert adapter.control_message(action="reject") == "reject"
+
+
+def test_opencode_adapter_control_messages_can_be_overridden(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CODING_PET_OPENCODE_APPROVE_TEXT", "accept")
+    monkeypatch.setenv("CODING_PET_OPENCODE_REJECT_TEXT", "deny")
+    adapter = OpenCodeAdapter()
+
+    assert adapter.control_message(action="approve") == "accept"
+    assert adapter.control_message(action="reject") == "deny"

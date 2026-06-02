@@ -39,7 +39,7 @@ async def test_widget_marks_restored_snapshot_sessions_read_only(tmp_path: Path)
 
         widget = app.widgets["alpha"]
         assert widget.status.live is False
-        assert widget.available_panel_actions() == ["open_workspace"]
+        assert widget.available_panel_actions() == ["open_workspace", "hide_pet"]
         assert widget.available_reply_shortcuts() == []
     finally:
         await app.disconnect_from_daemon()
@@ -72,6 +72,7 @@ async def test_widget_receives_action_result_message_without_overwriting_session
             "session_id": "alpha",
             "action": "send_reply",
             "ok": True,
+            "outcome": "accepted",
             "detail": "keep going delivered",
             "type": "action_result",
         }
@@ -79,6 +80,39 @@ async def test_widget_receives_action_result_message_without_overwriting_session
         assert widget.status.summary == "alpha:needs_input"
         assert widget.presentation().bubble_text == "Action sent: keep going delivered"
         assert widget.status.state is AttentionState.RUNNING
+    finally:
+        await app.disconnect_from_daemon()
+        await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_widget_accepts_future_action_outcome_without_legacy_ok(
+    tmp_path: Path,
+) -> None:
+    registry = SessionRegistry()
+    await registry.upsert(build_status("alpha", AttentionState.NEEDS_INPUT))
+    server = IpcServer(socket_path=tmp_path / "coding-pet.sock", registry=registry)
+    await server.start()
+
+    try:
+        app = CodingPetWidgetApp(socket_path=server.socket_path)
+        await app.connect_to_daemon(message_limit=1)
+        await app.apply_daemon_message(
+            {
+                "type": "action_result",
+                "session_id": "alpha",
+                "action": "send_reply",
+                "outcome": "accepted",
+                "detail": "backend accepted reply",
+            }
+        )
+
+        assert app.last_action_result is not None
+        assert app.last_action_result["ok"] is True
+        assert app.last_action_result["outcome"] == "accepted"
+        widget = app.widgets["alpha"]
+        assert widget.status.state is AttentionState.RUNNING
+        assert widget.presentation().bubble_text == "Action sent: backend accepted reply"
     finally:
         await app.disconnect_from_daemon()
         await server.stop()

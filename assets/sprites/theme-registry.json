@@ -1,11 +1,11 @@
 {
-  "default_theme": "company-pet",
+  "default_theme": "codex-default",
   "themes": [
     {
-      "theme": "company-pet",
-      "display_name": "Company Pet",
+      "theme": "codex-default",
+      "display_name": "Codex Default",
       "manifest": "theme-manifest.json",
-      "source": "internal-pilot-art"
+      "source": "generated-codex-style-default"
     },
     {
       "theme": "classic",

@@ -4,10 +4,16 @@
 node_modules/
 dist/
 build/
+wheelhouse/
+downloaded-pets/
+coding-pet-airgap-transfer/
+coding-pet-airgap-transfer.tar.gz
 .env
 __pycache__/
 *.pyc
 .venv/
+.venv-test/
+.venv-wsl/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

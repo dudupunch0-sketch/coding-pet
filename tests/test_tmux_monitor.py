@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -67,6 +68,12 @@ async def test_tmux_monitor_poll_discovers_captures_classifies_and_routes_input(
     assert status.tmux_pane_id == "%3"
     assert status.state is AttentionState.NEEDS_INPUT
     assert status.agent_waiting_message == "Need clarification: which env?"
+    send_reply = status.capability_for("send_reply")
+    attach = status.capability_for("attach")
+    assert send_reply is not None
+    assert send_reply.transport == "tmux_buffer"
+    assert attach is not None
+    assert attach.transport == "tmux_attach"
     assert manager.has_live_session("tmux-%3") is True
 
     result = await manager.route_action(
@@ -115,6 +122,83 @@ async def test_tmux_monitor_marks_missing_pane_not_live(tmp_path: Path) -> None:
     assert status is not None
     assert status.live is False
     assert manager.has_live_session("tmux-%3") is False
+
+
+@pytest.mark.asyncio
+async def test_tmux_monitor_removes_disappeared_completed_pane_after_retention(
+    tmp_path: Path,
+) -> None:
+    runner = FakeRunner()
+    registry = SessionRegistry()
+    manager = MonitorManager(
+        registry=registry,
+        completed_retention=timedelta(milliseconds=10),
+    )
+    store = TranscriptStore(tmp_path / "transcripts.sqlite")
+    await store.initialize()
+    service = TmuxMonitorService(
+        registry=registry,
+        manager=manager,
+        client=TmuxClient(runner=runner),
+        transcript_store=store,
+        config=TmuxConfig(enabled=True),
+    )
+
+    await service.poll_once()
+    runner.panes_text = ""
+    await service.poll_once()
+
+    disappeared = await registry.get("tmux-%3")
+    assert disappeared is not None
+    assert disappeared.live is False
+    assert disappeared.state is AttentionState.COMPLETED
+    assert disappeared.summary == "tmux pane ended"
+    await asyncio.sleep(0.05)
+
+    assert await registry.get("tmux-%3") is None
+
+
+@pytest.mark.asyncio
+async def test_tmux_monitor_preserves_failed_state_when_pane_disappears(
+    tmp_path: Path,
+) -> None:
+    runner = FakeRunner()
+    registry = SessionRegistry()
+    manager = MonitorManager(
+        registry=registry,
+        completed_retention=timedelta(milliseconds=10),
+    )
+    store = TranscriptStore(tmp_path / "transcripts.sqlite")
+    await store.initialize()
+    service = TmuxMonitorService(
+        registry=registry,
+        manager=manager,
+        client=TmuxClient(runner=runner),
+        transcript_store=store,
+        config=TmuxConfig(enabled=True),
+    )
+
+    await service.poll_once()
+    current = await registry.get("tmux-%3")
+    assert current is not None
+    await registry.upsert(
+        current.model_copy(
+            update={
+                "state": AttentionState.FAILED,
+                "summary": "agent failed",
+                "state_reason": "process_failed",
+            }
+        )
+    )
+    runner.panes_text = ""
+    await service.poll_once()
+    await asyncio.sleep(0.05)
+
+    disappeared = await registry.get("tmux-%3")
+    assert disappeared is not None
+    assert disappeared.live is False
+    assert disappeared.state is AttentionState.FAILED
+    assert disappeared.summary == "agent failed"
 
 
 @pytest.mark.asyncio
@@ -170,12 +254,91 @@ async def test_tmux_monitor_rejects_unsupported_tmux_action(tmp_path: Path) -> N
 
     await service.poll_once()
     result = await manager.route_action(
-        SessionActionRequest(session_id="tmux-%3", action="approve")
+        SessionActionRequest(session_id="tmux-%3", action="hide_pet")
     )
 
     assert result["ok"] is False
     assert result["reason"] == "unsupported_action"
-    assert result["detail"] == "approve is not supported for tmux sessions"
+    assert result["detail"] == "hide_pet is not supported for tmux sessions"
+
+
+@pytest.mark.asyncio
+async def test_tmux_monitor_routes_claude_approval_through_agent_control_message(
+    tmp_path: Path,
+) -> None:
+    runner = FakeRunner()
+    runner.capture_text = "Approval required before deleting files."
+    registry = SessionRegistry()
+    manager = MonitorManager(registry=registry)
+    store = TranscriptStore(tmp_path / "transcripts.sqlite")
+    await store.initialize()
+    service = TmuxMonitorService(
+        registry=registry,
+        manager=manager,
+        client=TmuxClient(runner=runner),
+        transcript_store=store,
+        config=TmuxConfig(enabled=True),
+    )
+
+    await service.poll_once()
+    status = await registry.get("tmux-%3")
+    assert status is not None
+    assert status.agent_kind is AgentKind.CLAUDE_CODE
+    assert status.state is AttentionState.NEEDS_PERMISSION
+
+    result = await manager.route_action(
+        SessionActionRequest(session_id="tmux-%3", action="approve")
+    )
+
+    assert result["ok"] is True
+    assert runner.loaded_texts == ["approve"]
+    assert "send-keys" in [call[1] for call in runner.calls]
+    updated = await registry.get("tmux-%3")
+    assert updated is not None
+    assert updated.state is AttentionState.RUNNING
+    assert updated.last_dashboard_input == "approve"
+    events = await store.list_recent_events("tmux-%3", 10)
+    assert [(event.direction, event.text) for event in events] == [
+        ("out", "Approval required before deleting files."),
+        ("in", "approve"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_tmux_monitor_routes_opencode_rejection_through_agent_control_message(
+    tmp_path: Path,
+) -> None:
+    runner = FakeRunner()
+    runner.capture_text = "Approval required before deleting files."
+    runner.panes_text = "%4|opencode-build|0.0|opencode|/proj/ws/build|opencode-build\n"
+    registry = SessionRegistry()
+    manager = MonitorManager(registry=registry)
+    store = TranscriptStore(tmp_path / "transcripts.sqlite")
+    await store.initialize()
+    service = TmuxMonitorService(
+        registry=registry,
+        manager=manager,
+        client=TmuxClient(runner=runner),
+        transcript_store=store,
+        config=TmuxConfig(enabled=True),
+    )
+
+    await service.poll_once()
+    status = await registry.get("tmux-%4")
+    assert status is not None
+    assert status.agent_kind is AgentKind.OPENCODE
+    assert status.state is AttentionState.NEEDS_PERMISSION
+
+    result = await manager.route_action(
+        SessionActionRequest(session_id="tmux-%4", action="reject")
+    )
+
+    assert result["ok"] is True
+    assert runner.loaded_texts == ["reject"]
+    updated = await registry.get("tmux-%4")
+    assert updated is not None
+    assert updated.state is AttentionState.RUNNING
+    assert updated.last_dashboard_input == "reject"
 
 
 @pytest.mark.asyncio

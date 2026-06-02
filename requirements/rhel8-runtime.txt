@@ -1,0 +1,5 @@
+-c constraints-rhel8.txt
+pydantic
+typer
+Pillow
+PySide6

@@ -5,12 +5,22 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
+from coding_pet.agents.base import AgentAdapter
+from coding_pet.agents.registry import default_agent_adapters
 from coding_pet.classifiers.agent_state import AgentStateClassifier
 from coding_pet.config import TmuxConfig
 from coding_pet.daemon.action_router import ActionResult, SessionActionRequest, failure_result
 from coding_pet.daemon.manager import MonitorManager
 from coding_pet.daemon.session_registry import SessionRegistry
-from coding_pet.models import AttentionState, SessionStatus, attention_priority
+from coding_pet.models import (
+    INACTIVE_SESSION_ACTIONS,
+    TMUX_LIVE_ACTIONS,
+    AgentKind,
+    AttentionState,
+    SessionStatus,
+    action_capabilities_for,
+    attention_priority,
+)
 from coding_pet.tmux.capture import new_output_from_snapshot, snapshot_hash
 from coding_pet.tmux.client import TmuxClient
 from coding_pet.tmux.control import send_raw_text_to_tmux_pane
@@ -41,6 +51,7 @@ class TmuxMonitorService:
     config: TmuxConfig
     stalled_after: timedelta = timedelta(seconds=300)
     on_transcript_event: TranscriptEventCallback | None = None
+    agent_adapters: dict[AgentKind, AgentAdapter] = field(default_factory=default_agent_adapters)
     classifier: AgentStateClassifier = field(init=False)
     _pane_states: dict[str, _PaneState] = field(default_factory=dict)
     _known_tmux_sessions: set[str] = field(default_factory=set)
@@ -187,6 +198,7 @@ class TmuxMonitorService:
             agent_waiting_message=decision.agent_waiting_message,
             state_reason=decision.reason,
             output_hash=current_hash,
+            supported_actions=list(TMUX_LIVE_ACTIONS),
         )
         await self.registry.upsert(updated)
         self.manager.register_control_channel(session_id, self._handle_action)
@@ -197,15 +209,28 @@ class TmuxMonitorService:
         if current is None:
             return
         now = datetime.now(UTC)
+        if current.state is AttentionState.FAILED:
+            next_state = AttentionState.FAILED
+            next_summary = current.summary
+            next_reason = current.state_reason or "pane_disappeared_after_failure"
+        else:
+            next_state = AttentionState.COMPLETED
+            next_summary = "tmux pane ended"
+            next_reason = "pane_disappeared"
         await self.registry.upsert(
             current.model_copy(
                 update={
                     "live": False,
-                    "state": AttentionState.UNKNOWN,
-                    "summary": "tmux pane disappeared",
+                    "state": next_state,
+                    "summary": next_summary,
                     "last_event_at": now,
-                    "state_reason": "pane_disappeared",
-                    "attention_score": attention_priority(AttentionState.UNKNOWN),
+                    "state_reason": next_reason,
+                    "attention_score": attention_priority(next_state),
+                    "supported_actions": list(INACTIVE_SESSION_ACTIONS),
+                    "action_capabilities": action_capabilities_for(
+                        INACTIVE_SESSION_ACTIONS,
+                        source_kind=current.source_kind,
+                    ),
                 }
             )
         )
@@ -221,6 +246,8 @@ class TmuxMonitorService:
             )
         if request.action in {"send_reply", "send_without_enter"}:
             return await self._send_input(request, current)
+        if request.action in {"approve", "reject"}:
+            return await self._send_agent_control_action(request, current)
         if request.action == "attach":
             target = current.tmux_session_name or current.tmux_pane_id
             return {
@@ -267,27 +294,52 @@ class TmuxMonitorService:
             detail=f"{request.action} is not supported for tmux sessions",
         )
 
-    async def _send_input(
+    async def _send_agent_control_action(
         self,
         request: SessionActionRequest,
         current: SessionStatus,
     ) -> ActionResult:
+        adapter = self.agent_adapters.get(current.agent_kind)
+        if adapter is None:
+            return failure_result(
+                session_id=request.session_id,
+                action=request.action,
+                reason="unsupported_agent",
+                detail=f"{current.agent_kind.value} has no tmux control adapter",
+            )
+        text = adapter.control_message(action=request.action)
+        if text is None:
+            return failure_result(
+                session_id=request.session_id,
+                action=request.action,
+                reason="unsupported_action",
+                detail=f"{request.action} is not supported by {current.agent_kind.value}",
+            )
+        return await self._send_input(request, current, text=text)
+
+    async def _send_input(
+        self,
+        request: SessionActionRequest,
+        current: SessionStatus,
+        *,
+        text: str | None = None,
+    ) -> ActionResult:
         assert current.tmux_pane_id is not None
-        text = request.reply_text or ""
+        delivered_text = text if text is not None else request.reply_text or ""
         now = datetime.now(UTC)
         if self.transcript_store is not None:
             await self._append_transcript_event(
                 session_id=request.session_id,
                 direction="in",
                 source="dashboard_input",
-                text=text,
+                text=delivered_text,
                 ts=now,
             )
         try:
             await asyncio.to_thread(
                 send_raw_text_to_tmux_pane,
                 current.tmux_pane_id,
-                text,
+                delivered_text,
                 press_enter=request.press_enter,
                 client=self.client,
             )
@@ -310,7 +362,7 @@ class TmuxMonitorService:
             update={
                 "state": AttentionState.RUNNING,
                 "summary": "Input sent",
-                "last_dashboard_input": text,
+                "last_dashboard_input": delivered_text,
                 "last_input_at": now,
                 "last_activity_at": now,
                 "last_event_at": now,
@@ -325,6 +377,7 @@ class TmuxMonitorService:
             "action": request.action,
             "ok": True,
             "reason": "delivered",
+            "delivered_text": delivered_text,
             "detail": f"input delivered to tmux pane {current.tmux_pane_id}",
         }
 

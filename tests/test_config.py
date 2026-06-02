@@ -90,6 +90,7 @@ def test_app_config_defaults_are_production_safe(tmp_path: Path) -> None:
     assert config.log_level == "INFO"
     assert config.capture_transcripts is False
     assert config.notification_cooldown_seconds == 60
+    assert config.process_stop_timeout_seconds == 2
 
 
 
@@ -104,8 +105,10 @@ def test_tmux_and_transcript_config_defaults_are_safe(tmp_path: Path) -> None:
 
     assert config.tmux.enabled is False
     assert config.tmux.capture_lines == 200
-    assert config.tmux.include_commands == ["claude", "opencode"]
+    assert config.tmux.include_commands == ["claude", "opencode", "codex"]
     assert config.transcript.db_path == tmp_path / "state" / "transcripts.sqlite"
+    assert config.transcript.redact_secrets is True
+    assert config.transcript.custom_redaction_patterns == ()
 
 
 def test_load_config_reads_tmux_environment_overrides(
@@ -134,3 +137,68 @@ def test_load_config_reads_transcript_enabled_override(
     config = load_config()
 
     assert config.transcript.enabled is False
+
+
+def test_load_config_reads_completed_retention_override(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("CODING_PET_SHOW_COMPLETED_FOR_SEC", "7")
+
+    config = load_config()
+
+    assert config.ui.show_completed_for_sec == 7
+
+
+def test_load_config_reads_process_stop_timeout_override(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("CODING_PET_PROCESS_STOP_TIMEOUT_SEC", "5")
+
+    config = load_config()
+
+    assert config.process_stop_timeout_seconds == 5
+
+
+def test_load_config_reads_transcript_redaction_override(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("CODING_PET_TRANSCRIPT_REDACT_SECRETS", "0")
+
+    config = load_config()
+
+    assert config.transcript.redact_secrets is False
+
+
+def test_load_config_reads_custom_transcript_redaction_patterns(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(
+        "CODING_PET_TRANSCRIPT_REDACTION_PATTERNS",
+        r"PROJECT-[0-9]{4};INTERNAL_SECRET_[A-Z]+",
+    )
+
+    config = load_config()
+
+    assert config.transcript.custom_redaction_patterns == (
+        r"PROJECT-[0-9]{4}",
+        r"INTERNAL_SECRET_[A-Z]+",
+    )
+
+
+def test_load_config_rejects_invalid_custom_redaction_pattern(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("CODING_PET_TRANSCRIPT_REDACTION_PATTERNS", "[")
+
+    with pytest.raises(ValueError, match="invalid custom redaction pattern"):
+        load_config()

@@ -5,6 +5,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final
 
+from coding_pet.transcripts.store import (
+    parse_custom_redaction_patterns,
+    validate_custom_redaction_patterns,
+)
+
 APP_NAME: Final = "coding-pet"
 
 
@@ -33,9 +38,9 @@ class TmuxConfig:
     poll_interval_ms: int = 1000
     capture_lines: int = 200
     include_session_patterns: list[str] = field(
-        default_factory=lambda: ["claude-*", "opencode-*", "agent-*"]
+        default_factory=lambda: ["claude-*", "opencode-*", "codex-*", "agent-*"]
     )
-    include_commands: list[str] = field(default_factory=lambda: ["claude", "opencode"])
+    include_commands: list[str] = field(default_factory=lambda: ["claude", "opencode", "codex"])
     exclude_session_patterns: list[str] = field(default_factory=list)
 
 
@@ -59,7 +64,8 @@ class TranscriptConfig:
     enabled: bool = True
     backend: str = "sqlite"
     max_events_per_session: int = 5000
-    redact_secrets: bool = False
+    redact_secrets: bool = True
+    custom_redaction_patterns: tuple[str, ...] = ()
     db_path: Path | None = None
 
 
@@ -73,6 +79,7 @@ class AppConfig:
     log_level: str = "INFO"
     capture_transcripts: bool = False
     notification_cooldown_seconds: int = 60
+    process_stop_timeout_seconds: int = 2
     ui: UiConfig = field(default_factory=UiConfig)
     terminal: TerminalConfig = field(default_factory=TerminalConfig)
     tmux: TmuxConfig = field(default_factory=TmuxConfig)
@@ -110,11 +117,19 @@ def _xdg_dir(env_name: str, home_relative: str) -> Path:
     override = _path_from_env(env_name)
     if override is not None:
         return override
-    home = Path(os.path.expanduser("~"))
-    return home / home_relative
+    return _home_dir() / home_relative
+
+
+def _home_dir() -> Path:
+    home = os.environ.get("HOME")
+    if home:
+        return Path(home).expanduser()
+    return Path(os.path.expanduser("~"))
 
 
 def _default_runtime_root() -> Path | None:
+    if not hasattr(os, "getuid"):
+        return None
     runtime_root = Path("/run/user") / str(os.getuid())
     if runtime_root.exists() and os.access(runtime_root, os.W_OK):
         return runtime_root
@@ -170,6 +185,12 @@ def load_config() -> AppConfig:
     transcript = TranscriptConfig(
         enabled=_bool_from_env("CODING_PET_TRANSCRIPT_ENABLED", True),
         max_events_per_session=_int_from_env("CODING_PET_TRANSCRIPT_MAX_EVENTS", 5000),
+        redact_secrets=_bool_from_env("CODING_PET_TRANSCRIPT_REDACT_SECRETS", True),
+        custom_redaction_patterns=validate_custom_redaction_patterns(
+            parse_custom_redaction_patterns(
+                os.getenv("CODING_PET_TRANSCRIPT_REDACTION_PATTERNS")
+            )
+        ),
         db_path=_path_from_env("CODING_PET_TRANSCRIPT_DB")
         or (resolved_state_dir / "transcripts.sqlite"),
     )
@@ -177,6 +198,13 @@ def load_config() -> AppConfig:
         stalled_after_sec=_int_from_env("CODING_PET_STALLED_AFTER_SEC", 300),
         waiting_after_idle_sec=_int_from_env("CODING_PET_WAITING_AFTER_IDLE_SEC", 5),
         manual_override=_bool_from_env("CODING_PET_MANUAL_OVERRIDE", True),
+    )
+    ui_defaults = UiConfig()
+    ui = UiConfig(
+        show_completed_for_sec=_int_from_env(
+            "CODING_PET_SHOW_COMPLETED_FOR_SEC",
+            ui_defaults.show_completed_for_sec,
+        )
     )
     terminal = TerminalConfig(attach_command=os.getenv("CODING_PET_ATTACH_COMMAND") or None)
 
@@ -192,7 +220,9 @@ def load_config() -> AppConfig:
         notification_cooldown_seconds=int(
             os.getenv("CODING_PET_NOTIFICATION_COOLDOWN_SECONDS", "60")
         ),
+        process_stop_timeout_seconds=_int_from_env("CODING_PET_PROCESS_STOP_TIMEOUT_SEC", 2),
         tmux=tmux,
+        ui=ui,
         transcript=transcript,
         state_detection=state_detection,
         terminal=terminal,

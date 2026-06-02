@@ -13,8 +13,8 @@ class PanelAction(StrEnum):
     SEND_REPLY = "send_reply"
     SEND_WITHOUT_ENTER = "send_without_enter"
     ATTACH = "attach"
-    FULL_LOG = "full_log"
     MARK_READ = "mark_read"
+    HIDE_PET = "hide_pet"
 
 
 @dataclass(slots=True)
@@ -53,19 +53,57 @@ class SessionPanelViewModel:
 
     def actions_for(self, status: SessionStatus) -> list[PanelAction]:
         if not status.live:
-            return [PanelAction.OPEN_WORKSPACE]
+            return self._filter_supported(
+                status,
+                [PanelAction.OPEN_WORKSPACE, PanelAction.HIDE_PET],
+            )
         if status.source_kind == "tmux" and status.tmux_pane_id:
-            actions = [PanelAction.ATTACH, PanelAction.FULL_LOG, PanelAction.MARK_READ]
-            if status.state.name in {"NEEDS_INPUT", "NEEDS_CHOICE", "NEEDS_PERMISSION"}:
-                return [PanelAction.SEND_REPLY, PanelAction.SEND_WITHOUT_ENTER, *actions]
-            return actions
+            actions = [PanelAction.ATTACH, PanelAction.MARK_READ]
+            if status.state.name == "NEEDS_PERMISSION":
+                return self._filter_supported(
+                    status,
+                    [
+                        PanelAction.APPROVE,
+                        PanelAction.REJECT,
+                        PanelAction.SEND_REPLY,
+                        PanelAction.SEND_WITHOUT_ENTER,
+                        *actions,
+                    ],
+                )
+            if status.state.name in {"NEEDS_INPUT", "NEEDS_CHOICE"}:
+                return self._filter_supported(
+                    status,
+                    [PanelAction.SEND_REPLY, PanelAction.SEND_WITHOUT_ENTER, *actions],
+                )
+            return self._filter_supported(status, actions)
         if status.state.name == "NEEDS_PERMISSION":
-            return [PanelAction.APPROVE, PanelAction.REJECT]
+            return self._filter_supported(
+                status,
+                [PanelAction.APPROVE, PanelAction.REJECT],
+            )
         if status.state.name == "NEEDS_INPUT":
-            return [PanelAction.SEND_REPLY]
+            return self._filter_supported(status, [PanelAction.SEND_REPLY])
         return [PanelAction.OPEN_WORKSPACE]
 
     def reply_shortcuts_for(self, status: SessionStatus) -> list[str]:
         if not status.live or status.state.name not in {"NEEDS_INPUT", "NEEDS_CHOICE"}:
             return []
+        if status.has_action_restrictions() and not status.supports_action(
+            PanelAction.SEND_REPLY.value
+        ):
+            return []
         return list(self.QUICK_REPLY_SHORTCUTS)
+
+    def _filter_supported(
+        self,
+        status: SessionStatus,
+        actions: list[PanelAction],
+    ) -> list[PanelAction]:
+        if not status.has_action_restrictions():
+            return actions
+        filtered = [
+            action
+            for action in actions
+            if action is PanelAction.OPEN_WORKSPACE or status.supports_action(action.value)
+        ]
+        return filtered or [PanelAction.OPEN_WORKSPACE]

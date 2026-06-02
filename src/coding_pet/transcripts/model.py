@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 TranscriptDirection = Literal["in", "out", "system"]
-TranscriptSource = Literal["tmux_capture", "dashboard_input", "system"]
+TranscriptSource = Literal["tmux_capture", "dashboard_input", "hook_event", "system"]
 
 
 class TranscriptEvent(BaseModel):

@@ -31,6 +31,7 @@ def test_discover_agent_panes_matches_commands_and_patterns_and_excludes() -> No
     panes = parse_list_panes_output(
         "%3|claude-auth|0.0|claude|/proj/ws/auth|claude-auth\n"
         "%5|opencode-build|0.0|node|/proj/ws/build|opencode-build\n"
+        "%6|codex-refactor|0.0|codex|/proj/ws/codex|codex-refactor\n"
         "%7|shell|0.0|bash|/proj/ws/debug|debug\n"
         "%9|claude-ignore|0.0|claude|/proj/ws/ignore|claude-ignore\n"
     )
@@ -41,6 +42,7 @@ def test_discover_agent_panes_matches_commands_and_patterns_and_excludes() -> No
     assert [(item.pane.pane_id, item.agent_kind) for item in discovered.matched] == [
         ("%3", AgentKind.CLAUDE_CODE),
         ("%5", AgentKind.OPENCODE),
+        ("%6", AgentKind.CODEX),
     ]
     assert {item.pane.pane_id: item.reason for item in discovered.ignored} == {
         "%7": "no matching agent rule",

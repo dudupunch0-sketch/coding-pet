@@ -1,0 +1,6 @@
+-c constraints-rhel8.txt
+-r rhel8-runtime.txt
+mypy
+pytest
+pytest-asyncio
+ruff
